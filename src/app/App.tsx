@@ -176,16 +176,17 @@ export default function App() {
 
   // Move focus to stage heading only on genuine stage navigation
   // Using a ref to track previous stage prevents re-focus on re-renders
-  const prevStageRef = useRef<number>(0);
+  // Track previous stage to only focus heading on genuine navigation,
+  // not on re-renders or initial load. Initialize to 1 so load doesn't trigger.
+  const prevStageRef = useRef<number>(1);
   useEffect(() => {
-    if (!plannerLoaded) return;
-    if (prevStageRef.current === currentStage) return; // no-op on re-renders
+    if (prevStageRef.current === currentStage) return;
     prevStageRef.current = currentStage;
     const timer = setTimeout(() => {
       stageHeadingRef.current?.focus();
     }, 450);
     return () => clearTimeout(timer);
-  }, [currentStage, plannerLoaded]);
+  }, [currentStage]);
 
   // Sync with planner state
   useEffect(() => {
