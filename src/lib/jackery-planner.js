@@ -38,7 +38,7 @@ const JACKERY_LINEUP = [
     name: "Explorer 300 Plus",
     capacityWh: 288,
     acOutputW: 300,
-    maxSolarInputW: 150,
+    maxSolarInputW: 100,
     weightKg: 3.75,
     compatiblePanels: ["solarsaga-40", "solarsaga-80", "solarsaga-100"],
     priceUSD: 299,
@@ -99,10 +99,10 @@ const JACKERY_LINEUP = [
 
 /** @type {SolarPanel[]} */
 const SOLARSAGA_PANELS = [
-  { id: "solarsaga-40",  name: "SolarSaga 40W",  wattage: 40,  weightKg: 2.0, priceUSD: 99  },
-  { id: "solarsaga-80",  name: "SolarSaga 80W",  wattage: 80,  weightKg: 4.1, priceUSD: 199 },
-  { id: "solarsaga-100", name: "SolarSaga 100W", wattage: 100, weightKg: 4.7, priceUSD: 229 },
-  { id: "solarsaga-200", name: "SolarSaga 200W", wattage: 200, weightKg: 7.3, priceUSD: 399 },
+  { id: "solarsaga-40",  name: "SolarSaga 40W",  wattage: 40,  weightKg: 1.2, priceUSD: 99  },
+  { id: "solarsaga-80",  name: "SolarSaga 80W",  wattage: 80,  weightKg: 5.0, priceUSD: 199 },
+  { id: "solarsaga-100", name: "SolarSaga 100W", wattage: 100, weightKg: 3.6, priceUSD: 229 },
+  { id: "solarsaga-200", name: "SolarSaga 200W", wattage: 200, weightKg: 6.8, priceUSD: 399 },
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -189,7 +189,7 @@ const APPLIANCE_LIBRARY = [
     name: "CPAP Machine",
     category: "Comfort & Health",
     logic: "duration",
-    wattage: 30,
+    wattage: 50,
     defaultHours: 8,
     efficiencyFactor: 0.95,
   },
@@ -198,7 +198,7 @@ const APPLIANCE_LIBRARY = [
     name: "Portable Fan",
     category: "Comfort & Health",
     logic: "duration",
-    wattage: 45,
+    wattage: 20,
     defaultHours: 8,
     efficiencyFactor: 0.92,
   },
@@ -858,6 +858,9 @@ const PlannerState = {
     if (!this.results.demand) return;
 
     const { totalWhNeeded, totalWhPerDay } = this.results.demand;
+
+    // Never announce when demand is zero — user hasn't interacted yet
+    if (totalWhPerDay === 0) return;
 
     if (this.currentStage === 1) {
       AriaLive.announce(

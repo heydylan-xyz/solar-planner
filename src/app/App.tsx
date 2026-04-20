@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from 'motion/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Battery, Sun, Zap, ChevronRight, CheckCircle2, Droplets, CloudRain, CloudSun, ShoppingCart, Award, TrendingUp, AlertCircle, UtensilsCrossed, Heart, Smartphone, Gamepad2, BatteryCharging, Bike } from 'lucide-react';
 
@@ -75,6 +76,13 @@ export default function App() {
   const [panelQuantities, setPanelQuantities] = useState<Record<string, number>>({});
   const [sunIntensity, setSunIntensity] = useState(100);
   const [plannerLoaded, setPlannerLoaded] = useState(false);
+  // Gate: suppress all aria-live announcements until user has interacted
+  const hasInteracted = useRef(false);
+  // Respect user's reduced motion OS preference
+  const prefersReducedMotion = useReducedMotion();
+  // Stage heading ref — receives focus on every stage transition so TalkBack
+  // announces the heading then lets the user swipe through page content naturally
+  const stageHeadingRef = useRef<HTMLHeadingElement>(null);
   const [results, setResults] = useState<PlannerResults>({
     demand: null,
     stationRecs: null,
@@ -166,6 +174,17 @@ export default function App() {
     }
   }, [plannerLoaded]);
 
+  // Move focus to stage heading on every navigation — critical for TalkBack/VoiceOver
+  // Without this, screen readers go silent after stage transitions
+  useEffect(() => {
+    if (!plannerLoaded) return;
+    // Small delay allows AnimatePresence to mount the new stage DOM before focus
+    const timer = setTimeout(() => {
+      stageHeadingRef.current?.focus();
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [currentStage, plannerLoaded]);
+
   // Sync with planner state
   useEffect(() => {
     if (!plannerLoaded || !window.JackeryPlanner) return;
@@ -184,8 +203,12 @@ export default function App() {
       }
     });
 
+    // Mark that the user has interacted — enables ARIA live announcements
+    if (Object.keys(selectedAppliances).length > 0) {
+      hasInteracted.current = true;
+    }
+
     // Compute and manually update results
-    // FIX: also re-apply station so Stage 2 recommendation updates instantly
     if (selectedStation) {
       window.JackeryPlanner.state.selectStation(selectedStation);
     }
@@ -342,9 +365,9 @@ export default function App() {
   );
 
   const getWeatherIcon = () => {
-    if (sunIntensity >= 75) return <Sun className="w-8 h-8" />;
-    if (sunIntensity >= 40) return <CloudSun className="w-8 h-8" />;
-    return <CloudRain className="w-8 h-8" />;
+    if (sunIntensity >= 75) return <Sun className="w-8 h-8" aria-hidden="true" />;
+    if (sunIntensity >= 40) return <CloudSun className="w-8 h-8" aria-hidden="true" />;
+    return <CloudRain className="w-8 h-8" aria-hidden="true" />;
   };
 
   const getWeatherLabel = () => {
@@ -354,7 +377,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-white">
       {/* ARIA Live Regions - Must be present before planner loads */}
       <div id="aria-polite-live" role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
       <div id="aria-assertive-live" role="alert" aria-live="assertive" aria-atomic="true" className="sr-only" />
@@ -363,7 +386,7 @@ export default function App() {
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 bg-[#FF5000] rounded-2xl flex items-center justify-center mb-4 mx-auto animate-pulse">
-              <Battery className="w-10 h-10 text-white" />
+              <Battery className="w-10 h-10 text-white" aria-hidden="true" />
             </div>
             <div className="text-xl font-semibold text-gray-600">Loading Planner...</div>
           </div>
@@ -376,9 +399,9 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <a href="/" aria-label="Jackery Solar Planner — click to restart" className="flex items-center gap-2 sm:gap-3">
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#FF5000] rounded-lg flex items-center justify-center">
-              <Battery className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              <Battery className="w-5 h-5 sm:w-6 sm:h-6 text-white" aria-hidden="true" />
             </div>
-            <h1 className="text-lg sm:text-2xl" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 700 }}>
+            <h1 className="text-lg sm:text-2xl">
               Jackery Solar Planner
             </h1>
           </a>
@@ -403,7 +426,6 @@ export default function App() {
                     : 'bg-[#F5F5F7] text-gray-700 hover:bg-gray-200'
                   }
                 `}
-                style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 600 }}
               >
                 <Icon className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline text-sm sm:text-base">{label}</span>
@@ -418,10 +440,10 @@ export default function App() {
         <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-white" />
+              <Zap className="w-5 h-5 text-white" aria-hidden="true" />
               <div>
                 <div className="text-xs font-medium text-white">Total Demand</div>
-                <div className="text-lg font-bold text-white" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <div className="text-lg font-bold text-white">
                   {totalDemand.toLocaleString()} Wh
                 </div>
               </div>
@@ -436,7 +458,7 @@ export default function App() {
               }`}
             >
               Next
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -448,7 +470,7 @@ export default function App() {
             <div className="max-w-7xl mx-auto space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Battery className="w-5 h-5 text-white" />
+                  <Battery className="w-5 h-5 text-white" aria-hidden="true" />
                   <div className="text-sm font-semibold text-white">
                     {selectedStation ? stations.find((s: JackeryStation) => s.id === selectedStation)?.name : 'Select Station'}
                   </div>
@@ -463,7 +485,7 @@ export default function App() {
                   }`}
                 >
                   Next
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 </button>
               </div>
               {selectedStation && (
@@ -474,7 +496,14 @@ export default function App() {
                       {(Math.min(100, (results.demand?.totalWhNeeded || 0) / Math.max(1, (stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 1) * stationQuantity) * 100) || 0).toFixed(0)}%
                     </span>
                   </div>
-                  <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-2 bg-white/30 rounded-full overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={Math.min(100, Math.round(((results.demand?.totalWhNeeded || 0) / Math.max(1, (stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 1) * stationQuantity)) * 100))}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Battery capacity used"
+                  >
                     <div
                       className="h-full bg-white rounded-full transition-all duration-500"
                       style={{
@@ -529,7 +558,7 @@ export default function App() {
                             ? 'text-amber-900'
                             : 'text-red-900'
                         }
-                      `} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                      `}>
                         {capacityWarning.text}
                       </div>
                       <div className={`
@@ -571,10 +600,10 @@ export default function App() {
         <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Sun className="w-5 h-5 text-white" />
+              <Sun className="w-5 h-5 text-white" aria-hidden="true" />
               <div>
                 <div className="text-xs font-medium text-white">Net Daily Balance</div>
-                <div className={`text-lg font-bold ${netWhPerDay >= 0 ? 'text-white' : 'text-red-100'}`} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                <div className={`text-lg font-bold ${netWhPerDay >= 0 ? 'text-white' : 'text-red-100'}`}>
                   {netWhPerDay >= 0 ? '+' : ''}{netWhPerDay} Wh
                 </div>
               </div>
@@ -584,7 +613,7 @@ export default function App() {
               className="px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-1 bg-white text-[#FF5000] shadow-md"
             >
               Review
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -604,17 +633,22 @@ export default function App() {
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="mb-4 sm:mb-6 lg:mb-8">
-                <h2 className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 800 }}>
+                <h2
+                  ref={stageHeadingRef}
+                  tabIndex={-1}
+                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 outline-none"
+                  aria-label="Stage 1 of 4: Define Your Energy Needs. Select the devices you'll power."
+                >
                   Define Your Energy Needs
                 </h2>
-                <p className="text-gray-700 text-sm sm:text-base lg:text-lg">Select the devices you'll power</p>
+                <p className="text-gray-700 text-sm sm:text-base lg:text-lg" aria-hidden="true">Select the devices you'll power</p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 lg:gap-8 pb-20 lg:pb-0">
                 <div className="space-y-4 lg:space-y-6">
                   {/* Category Navigation Pills */}
                   <div className="bg-white p-2 rounded-xl lg:rounded-2xl border-2 border-gray-200 shadow-sm">
-                    <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide">
+                    <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Appliance categories">
                       {categories.map((category) => {
                         const CategoryIcon = categoryMap[category].icon;
                         const isActive = selectedCategory === category;
@@ -622,6 +656,9 @@ export default function App() {
                         return (
                           <button
                             key={category}
+                            role="tab"
+                            aria-selected={isActive}
+                            aria-controls={`panel-${category}`}
                             onClick={() => setSelectedCategory(category)}
                             className={`
                               flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 lg:py-3 rounded-lg lg:rounded-xl font-semibold whitespace-nowrap transition-all duration-300 text-sm sm:text-base
@@ -630,7 +667,6 @@ export default function App() {
                                 : 'bg-transparent text-gray-700 hover:bg-gray-100'
                               }
                             `}
-                            style={{ fontFamily: "'Manrope', sans-serif" }}
                           >
                             <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                             <span className="hidden sm:inline">{category}</span>
@@ -648,6 +684,9 @@ export default function App() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
                       transition={{ duration: 0.3 }}
+                      role="tabpanel"
+                      id={`panel-${selectedCategory}`}
+                      aria-label={`${selectedCategory} appliances`}
                       className="grid sm:grid-cols-2 gap-4"
                     >
                       {currentCategoryAppliances.map((appliance: Appliance, index: number) => {
@@ -660,6 +699,21 @@ export default function App() {
                           <motion.div
                             key={appliance.id}
                             layout
+                            role={!isSelected ? "button" : "article"}
+                            tabIndex={!isSelected ? 0 : undefined}
+                            aria-label={!isSelected
+                              ? `Add ${appliance.name}, ${appliance.wattage} watts${isHighEnergy ? ", high energy device" : ""}`
+                              : `${appliance.name} selected, ${qty} ${appliance.logic === 'event' ? 'uses' : 'hours'} per day`
+                            }
+                            onKeyDown={(e) => {
+                              if (!isSelected && (e.key === 'Enter' || e.key === ' ')) {
+                                e.preventDefault();
+                                setSelectedAppliances((prev: Record<string, number>) => ({
+                                  ...prev,
+                                  [appliance.id]: appliance.logic === 'event' ? (appliance.defaultUses || 1) : (appliance.defaultHours || 1)
+                                }));
+                              }
+                            }}
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: index * 0.05, duration: 0.3 }}
@@ -682,7 +736,7 @@ export default function App() {
                           >
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1 pr-2">
-                                <h3 className="font-semibold text-base sm:text-lg mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                                <h3 className="font-semibold text-base sm:text-lg mb-1">
                                   {appliance.name}
                                 </h3>
                                 <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm flex-wrap">
@@ -699,7 +753,7 @@ export default function App() {
                                 </div>
                               </div>
                               {isSelected && (
-                                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF5000] flex-shrink-0" />
+                                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-[#FF5000] flex-shrink-0" aria-hidden="true" />
                               )}
                             </div>
 
@@ -725,14 +779,13 @@ export default function App() {
                                     }
                                   }}
                                   className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-white border-2 border-[#FF5000] text-[#FF5000] hover:bg-[#FF5000] hover:text-white flex items-center justify-center font-bold text-lg sm:text-xl transition-all"
-                                  aria-label="Decrease quantity"
+                                  aria-label={`Decrease ${appliance.name} quantity, currently ${qty}`}
                                 >
                                   −
                                 </button>
                                 <span
                                   className="flex-1 text-center font-bold text-sm sm:text-base lg:text-lg"
                                   id={`qty-${appliance.id}`}
-                                  style={{ fontFamily: "'Manrope', sans-serif" }}
                                 >
                                   {qty} {appliance.logic === 'event' ? 'uses' : 'hrs'}/day
                                 </span>
@@ -742,7 +795,7 @@ export default function App() {
                                     setSelectedAppliances(prev => ({ ...prev, [appliance.id]: qty + 1 }));
                                   }}
                                   className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-[#FF5000] text-white hover:bg-[#E64500] flex items-center justify-center font-bold text-lg sm:text-xl transition-all shadow-lg shadow-[#FF5000]/25"
-                                  aria-label="Increase quantity"
+                                  aria-label={`Increase ${appliance.name} quantity, currently ${qty}`}
                                 >
                                   +
                                 </button>
@@ -758,16 +811,17 @@ export default function App() {
                 {/* Demand Summary Sidebar - Hidden on Mobile */}
                 <div className="hidden lg:block lg:sticky lg:top-24 h-fit">
                   <div className="bg-gradient-to-br from-gray-50 to-white p-6 lg:p-8 rounded-2xl border-2 border-gray-200 shadow-lg">
-                    <h3 className="text-lg lg:text-xl font-bold mb-6 text-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <h3 className="text-lg lg:text-xl font-bold mb-6 text-center">
                       Daily Demand
                     </h3>
 
                     <div className="mb-6 text-center">
                       <div
                         id="total-demand-wh"
-                        aria-live="polite"
+                        aria-live={hasInteracted.current ? "polite" : "off"}
+                        aria-atomic="true"
+                        aria-label={hasInteracted.current ? `${totalDemand.toLocaleString()} watt-hours per day` : undefined}
                         className="text-4xl lg:text-5xl font-bold text-[#C93D00] mb-2"
-                        style={{ fontFamily: "'Manrope', sans-serif" }}
                       >
                         {totalDemand.toLocaleString()}
                       </div>
@@ -796,10 +850,9 @@ export default function App() {
                           : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                         }
                       `}
-                      style={{ fontFamily: "'Manrope', sans-serif" }}
                     >
                       Next: Choose Station
-                      <ChevronRight className="w-5 h-5" />
+                      <ChevronRight className="w-5 h-5" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -818,10 +871,15 @@ export default function App() {
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="mb-4 sm:mb-6 lg:mb-8">
-                <h2 className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 800 }}>
+                <h2
+                  ref={stageHeadingRef}
+                  tabIndex={-1}
+                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 outline-none"
+                  aria-label={`Stage 2 of 4: Choose Your Power Station. You need ${results.demand?.totalWhNeeded || 0} watt-hours of capacity.`}
+                >
                   Choose Your Power Station
                 </h2>
-                <p className="text-gray-700 text-xs sm:text-sm lg:text-base">
+                <p className="text-gray-700 text-xs sm:text-sm lg:text-base" aria-hidden="true">
                   Need: {results.demand?.totalWhNeeded || 0} Wh capacity
                 </p>
               </div>
@@ -881,6 +939,7 @@ export default function App() {
                         data-viable={isViable}
                         aria-disabled={!isViable}
                         role="button"
+                        aria-pressed={isSelected}
                         tabIndex={isViable ? 0 : -1}
                         onKeyDown={(e) => {
                           if ((e.key === 'Enter' || e.key === ' ') && isViable) {
@@ -904,7 +963,7 @@ export default function App() {
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-3">
                           <div className="flex-1">
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
-                              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold">
                                 {station.name}
                               </h3>
                               {/* Qty Needed Badge */}
@@ -929,7 +988,7 @@ export default function App() {
                             )}
                           </div>
                           <div className="flex sm:flex-col items-center sm:items-end gap-2">
-                            <div className="text-xl sm:text-2xl font-bold" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                            <div className="text-xl sm:text-2xl font-bold">
                               ${station.priceUSD.toLocaleString()}
                             </div>
                             {(isBestFit || isHeroRecommendation) && (
@@ -949,7 +1008,14 @@ export default function App() {
                               {combinedCapacity.toLocaleString()} Wh
                             </span>
                           </div>
-                          <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-3 bg-gray-100 rounded-full overflow-hidden"
+                            role="progressbar"
+                            aria-valuenow={capacityPercent}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label={`${station.name} capacity usage: ${capacityPercent}%`}
+                          >
                             <motion.div
                               initial={{ width: 0 }}
                               animate={{ width: `${capacityPercent}%` }}
@@ -993,7 +1059,7 @@ export default function App() {
                                 </div>
                               ) : (
                                 <>
-                                  <div className="text-xl sm:text-2xl font-bold text-[#FF5000]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                                  <div className="text-xl sm:text-2xl font-bold text-[#FF5000]">
                                     {stationQuantity}
                                   </div>
                                   <div className="text-xs text-gray-500">stations</div>
@@ -1019,7 +1085,7 @@ export default function App() {
                         {recommendedStations.length > 0 && (
                           <div className="space-y-4">
                             <div className="mb-6">
-                              <h3 className="text-lg font-bold text-gray-900 mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                              <h3 className="text-lg font-bold text-gray-900 mb-1">
                                 Recommended Systems
                               </h3>
                               <p className="text-sm text-gray-600">
@@ -1051,7 +1117,7 @@ export default function App() {
                 {/* Battery Visualizer - Hidden on Mobile */}
                 <div className="hidden lg:block lg:sticky lg:top-24 h-fit">
                   <div className="bg-gradient-to-br from-gray-50 to-white p-6 lg:p-8 rounded-2xl border-2 border-gray-200 shadow-lg">
-                    <h3 className="text-lg lg:text-xl font-bold mb-6 text-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <h3 className="text-lg lg:text-xl font-bold mb-6 text-center">
                       {selectedStation && stationQuantity > 1 ? 'Combined System Capacity' : 'Battery Capacity'}
                     </h3>
 
@@ -1081,7 +1147,7 @@ export default function App() {
                       {selectedStation && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center z-10 pointer-events-none">
                           <div className="bg-white/95 backdrop-blur-sm px-4 py-3 rounded-xl shadow-lg">
-                            <div className="text-3xl font-bold text-[#FF5000]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                            <div className="text-3xl font-bold text-[#FF5000]">
                               {(Math.min(100, (results.demand?.totalWhNeeded || 0) / Math.max(1, (stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 1) * stationQuantity) * 100) || 0).toFixed(0)}%
                             </div>
                             <div className="text-sm text-gray-600">used</div>
@@ -1097,7 +1163,7 @@ export default function App() {
                         className="text-center space-y-2 mb-6"
                       >
                         <div className="text-sm text-gray-600">Selected Station</div>
-                        <div className="text-xl font-bold" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        <div className="text-xl font-bold">
                           {stations.find((s: JackeryStation) => s.id === selectedStation)?.name}
                         </div>
                         {stationQuantity > 1 && (
@@ -1122,10 +1188,9 @@ export default function App() {
                           : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                         }
                       `}
-                      style={{ fontFamily: "'Manrope', sans-serif" }}
                     >
                       Next: Configure Solar
-                      <ChevronRight className="w-5 h-5" />
+                      <ChevronRight className="w-5 h-5" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -1144,10 +1209,15 @@ export default function App() {
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="mb-4 sm:mb-6 lg:mb-8">
-                <h2 className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 800 }}>
+                <h2
+                  ref={stageHeadingRef}
+                  tabIndex={-1}
+                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 outline-none"
+                  aria-label="Stage 3 of 4: Plan Your Solar Recovery. Select your SolarSaga panels and configure your setup."
+                >
                   Plan Your Solar Recovery
                 </h2>
-                <p className="text-gray-700 text-xs sm:text-sm lg:text-base">Select your SolarSaga panels and configure your setup</p>
+                <p className="text-gray-700 text-xs sm:text-sm lg:text-base" aria-hidden="true">Select your SolarSaga panels and configure your setup</p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 lg:gap-8">
@@ -1156,7 +1226,7 @@ export default function App() {
                   {/* Sun Intensity Slider */}
                   <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 sm:p-6 lg:p-8 rounded-xl lg:rounded-2xl border-2 border-amber-200 shadow-lg">
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
-                      <h3 className="text-lg sm:text-xl lg:text-2xl font-bold" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                      <h3 className="text-lg sm:text-xl lg:text-2xl font-bold">
                         Sun Intensity
                       </h3>
                       <motion.div
@@ -1181,6 +1251,8 @@ export default function App() {
                       min="0"
                       max="100"
                       value={sunIntensity}
+                      aria-label="Sun intensity"
+                      aria-valuetext={`${sunIntensity}% — ${getWeatherLabel()}`}
                       onChange={(e) => setSunIntensity(parseInt(e.target.value))}
                       className="w-full h-4 rounded-full appearance-none cursor-pointer"
                       style={{
@@ -1189,7 +1261,7 @@ export default function App() {
                     />
 
                     <div className="mt-3 text-center">
-                      <span className="text-2xl font-bold text-[#FF5000]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                      <span className="text-2xl font-bold text-[#FF5000]">
                         {sunIntensity}%
                       </span>
                       <span className="text-sm text-gray-600 ml-2">· {getWeatherLabel()}</span>
@@ -1198,7 +1270,7 @@ export default function App() {
 
                   {/* Panel Selection Grid */}
                   <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-xl lg:rounded-2xl border-2 border-gray-200 shadow-lg">
-                    <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-3 sm:mb-4" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <h3 className="text-lg sm:text-xl lg:text-2xl font-bold mb-3 sm:mb-4">
                       SolarSaga Panel Selection
                     </h3>
                     <p className="text-sm text-gray-600 mb-4 sm:mb-6">Choose the panels that fit your portable power needs</p>
@@ -1227,7 +1299,7 @@ export default function App() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 sm:gap-3 mb-2">
                                 <Sun className={`w-8 h-8 sm:w-10 sm:h-10 ${isSelected ? 'text-[#FF5000]' : 'text-gray-400'}`} />
-                                <div className="text-2xl sm:text-3xl font-bold" style={{ fontFamily: "'Manrope', sans-serif", color: isSelected ? '#FF5000' : '#1a1a1a' }}>
+                                <div className="text-2xl sm:text-3xl font-bold" style={{ color: isSelected ? '#FF5000' : '#1a1a1a' }}>
                                   {panel.wattage}W
                                 </div>
                               </div>
@@ -1239,7 +1311,7 @@ export default function App() {
                               </div>
                             </div>
                             {isSelected && (
-                              <CheckCircle2 className="w-6 h-6 text-[#FF5000] flex-shrink-0" />
+                              <CheckCircle2 className="w-6 h-6 text-[#FF5000] flex-shrink-0" aria-hidden="true" />
                             )}
                           </div>
 
@@ -1256,7 +1328,7 @@ export default function App() {
                               −
                             </button>
                             <div className="flex-1 text-center">
-                              <div className="text-2xl sm:text-3xl font-bold text-[#FF5000]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                              <div className="text-2xl sm:text-3xl font-bold text-[#FF5000]">
                                 {qty}
                               </div>
                               <div className="text-xs text-gray-500">panels</div>
@@ -1276,7 +1348,7 @@ export default function App() {
                           {isSelected && (
                             <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center text-sm">
                               <span className="text-gray-600">{qty * panel.wattage}W total</span>
-                              <span className="font-bold text-[#FF5000]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                              <span className="font-bold text-[#FF5000]">
                                 ${((panel.priceUSD || 0) * qty).toLocaleString()}
                               </span>
                             </div>
@@ -1290,7 +1362,7 @@ export default function App() {
                     {totalPanelCount > 0 && (
                       <div className="mt-6 p-4 bg-gray-50 rounded-xl flex items-center justify-between">
                         <div className="font-semibold text-gray-700">Total Panels Selected:</div>
-                        <div className="text-2xl font-bold text-[#FF5000]" id="panel-qty" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        <div className="text-2xl font-bold text-[#FF5000]" id="panel-qty">
                           {totalPanelCount}
                         </div>
                       </div>
@@ -1301,7 +1373,7 @@ export default function App() {
                 {/* Right Sidebar: Solar Generation & Energy Balance - Hidden on Mobile */}
                 <div className="hidden lg:block lg:sticky lg:top-24 h-fit space-y-3 sm:space-y-4">
                   <div className="bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8 rounded-xl lg:rounded-2xl border-2 border-gray-200 shadow-lg">
-                    <h3 className="text-base sm:text-lg lg:text-xl font-bold mb-4 sm:mb-6 text-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <h3 className="text-base sm:text-lg lg:text-xl font-bold mb-4 sm:mb-6 text-center">
                       Solar Generation
                     </h3>
 
@@ -1310,7 +1382,6 @@ export default function App() {
                       <div
                         id="solar-input-watts"
                         className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#FF5000]"
-                        style={{ fontFamily: "'Manrope', sans-serif" }}
                       >
                         {Math.round(realTimeSolarInput)}W
                       </div>
@@ -1320,14 +1391,14 @@ export default function App() {
                     <div className="space-y-2 sm:space-y-3 p-3 sm:p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg sm:rounded-xl border border-green-200">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Daily Recovery</span>
-                        <span className="text-lg font-bold text-green-700" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        <span className="text-lg font-bold text-green-700">
                           {solarDailyRecoveryWh} Wh
                         </span>
                       </div>
                       {solarDaysToFullCharge && (
                         <div className="flex justify-between items-center pt-3 border-t border-green-200">
                           <span className="text-sm text-gray-600">Full Charge Time</span>
-                          <span className="text-lg font-bold text-[#FF5000]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                          <span className="text-lg font-bold text-[#FF5000]">
                             {solarDaysToFullCharge} days
                           </span>
                         </div>
@@ -1350,20 +1421,20 @@ export default function App() {
                         }
                       `}
                     >
-                      <h3 className="text-base sm:text-lg lg:text-xl font-bold mb-3 sm:mb-4 text-center" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                      <h3 className="text-base sm:text-lg lg:text-xl font-bold mb-3 sm:mb-4 text-center">
                         Energy Balance
                       </h3>
 
                       <div className="space-y-2 sm:space-y-3">
                         <div className="flex items-center justify-between p-2 sm:p-3 bg-white/70 rounded-lg text-sm sm:text-base">
                           <span className="text-xs sm:text-sm text-gray-600">Status</span>
-                          <span className="text-base sm:text-lg font-bold capitalize" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                          <span className="text-base sm:text-lg font-bold capitalize">
                             {netStatus}
                           </span>
                         </div>
                         <div className="flex items-center justify-between p-2 sm:p-3 bg-white/70 rounded-lg text-sm sm:text-base">
                           <span className="text-xs sm:text-sm text-gray-600">Coverage</span>
-                          <span className="text-base sm:text-lg font-bold" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                          <span className="text-base sm:text-lg font-bold">
                             {coveragePercent}%
                           </span>
                         </div>
@@ -1371,7 +1442,6 @@ export default function App() {
                           <span className="text-xs sm:text-sm text-gray-600">Net Daily Balance</span>
                           <span
                             className={`text-lg font-bold ${netWhPerDay >= 0 ? 'text-green-600' : 'text-red-600'}`}
-                            style={{ fontFamily: "'Manrope', sans-serif" }}
                           >
                             {netWhPerDay >= 0 ? '+' : ''}{netWhPerDay} Wh
                           </span>
@@ -1387,10 +1457,9 @@ export default function App() {
                     transition={{ delay: 0.5 }}
                     onClick={() => setCurrentStage(4)}
                     className="w-full mt-6 py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-300 bg-[#FF5000] text-white hover:bg-[#E64500] shadow-lg shadow-[#FF5000]/25 hover:shadow-xl hover:shadow-[#FF5000]/30"
-                    style={{ fontFamily: "'Manrope', sans-serif" }}
                   >
                     Review System
-                    <ChevronRight className="w-5 h-5" />
+                    <ChevronRight className="w-5 h-5" aria-hidden="true" />
                   </motion.button>
                 </div>
               </div>
@@ -1408,10 +1477,15 @@ export default function App() {
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="mb-6 sm:mb-8">
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl mb-2" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 800 }}>
+                <h2
+                  ref={stageHeadingRef}
+                  tabIndex={-1}
+                  className="text-2xl sm:text-3xl lg:text-4xl mb-2 outline-none"
+                  aria-label="Stage 4 of 4: System Review and Checkout. Your complete solar power solution."
+                >
                   System Review & Checkout
                 </h2>
-                <p className="text-gray-700 text-base sm:text-lg">Your complete solar power solution</p>
+                <p className="text-gray-700 text-base sm:text-lg" aria-hidden="true">Your complete solar power solution</p>
               </div>
 
               <div className="max-w-4xl mx-auto">
@@ -1422,18 +1496,18 @@ export default function App() {
                   <div className="bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-8 py-4 sm:py-6 text-white">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-xl sm:text-2xl font-bold mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        <h3 className="text-xl sm:text-2xl font-bold mb-1">
                           Complete System
                         </h3>
                         <p className="text-sm sm:text-base text-white/90">Ready to power your adventure</p>
                       </div>
-                      <Award className="w-10 h-10 sm:w-12 sm:h-12 text-white/90" />
+                      <Award className="w-10 h-10 sm:w-12 sm:h-12 text-white/90" aria-hidden="true" />
                     </div>
                   </div>
 
                   {/* Hardware Summary */}
                   <div className="p-4 sm:p-8 border-b-2 border-gray-100">
-                    <h4 className="text-xl font-bold mb-4 flex items-center gap-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <h4 className="text-xl font-bold mb-4 flex items-center gap-2">
                       <Battery className="w-5 h-5 text-[#FF5000]" />
                       Hardware Summary
                     </h4>
@@ -1483,7 +1557,7 @@ export default function App() {
                               {/* Total */}
                               <div className="pt-2 border-t border-[#FF5000]/20 flex justify-between items-center">
                                 <span className="text-sm font-semibold">Total Capacity:</span>
-                                <span className="text-lg font-bold text-[#FF5000]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                                <span className="text-lg font-bold text-[#FF5000]">
                                   {((stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0) * stationQuantity).toLocaleString()} Wh
                                 </span>
                               </div>
@@ -1491,7 +1565,7 @@ export default function App() {
                           ) : (
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <div className="font-bold text-lg mb-1" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                                <div className="font-bold text-lg mb-1">
                                   {stationQuantity}x {stations.find((s: JackeryStation) => s.id === selectedStation)?.name}
                                 </div>
                                 <div className="text-sm text-gray-600">
@@ -1499,7 +1573,7 @@ export default function App() {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="text-2xl font-bold text-[#FF5000]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                                <div className="text-2xl font-bold text-[#FF5000]">
                                   ${(selectedStation === 'explorer-5000-plus' && stationQuantity > 1
                             ? (stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) + ((stationQuantity - 1) * 2999)
                             : ((stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) * stationQuantity)
@@ -1558,7 +1632,7 @@ export default function App() {
 
                   {/* Energy Capability */}
                   <div className="p-4 sm:p-8 border-b-2 border-gray-100">
-                    <h4 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <h4 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-[#FF5000]" />
                       Energy Capability
                     </h4>
@@ -1566,7 +1640,7 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border border-gray-200">
                         <div className="text-sm text-gray-600 mb-1">Daily Demand</div>
-                        <div className="text-2xl sm:text-3xl font-bold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        <div className="text-2xl sm:text-3xl font-bold text-gray-900">
                           {results.demand?.totalWhPerDay || 0}
                         </div>
                         <div className="text-xs text-gray-500">Wh/day</div>
@@ -1574,7 +1648,7 @@ export default function App() {
 
                       <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
                         <div className="text-sm text-gray-600 mb-1">Solar Recovery</div>
-                        <div className="text-2xl sm:text-3xl font-bold text-green-700" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        <div className="text-2xl sm:text-3xl font-bold text-green-700">
                           {solarDailyRecoveryWh}
                         </div>
                         <div className="text-xs text-gray-500">Wh/day</div>
@@ -1582,7 +1656,7 @@ export default function App() {
 
                       <div className="bg-gradient-to-br from-blue-50 to-sky-50 p-4 rounded-xl border border-blue-200">
                         <div className="text-sm text-gray-600 mb-1">Net Balance</div>
-                        <div className={`text-2xl sm:text-3xl font-bold ${netWhPerDay >= 0 ? 'text-green-600' : 'text-red-600'}`} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        <div className={`text-2xl sm:text-3xl font-bold ${netWhPerDay >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {netWhPerDay >= 0 ? '+' : ''}{netWhPerDay}
                         </div>
                         <div className="text-xs text-gray-500">Wh/day</div>
@@ -1592,7 +1666,7 @@ export default function App() {
 
                   {/* System Health */}
                   <div className="p-4 sm:p-8">
-                    <h4 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                    <h4 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
                       <Award className="w-5 h-5 text-[#FF5000]" />
                       System Health
                     </h4>
@@ -1672,7 +1746,7 @@ export default function App() {
                     <div className="flex items-center justify-between mb-6">
                       <div>
                         <div className="text-sm text-gray-600 mb-1">Estimated System Total</div>
-                        <div className="text-4xl font-bold text-gray-900" style={{ fontFamily: "'Manrope', sans-serif" }}>
+                        <div className="text-4xl font-bold text-gray-900">
                           ${(() => {
                             const stationTotal = selectedStation
                               ? (selectedStation === 'explorer-5000-plus' && stationQuantity > 1
@@ -1695,10 +1769,15 @@ export default function App() {
                     <button
                       id="checkout-button"
                       className="w-full py-5 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300 bg-[#FF5000] text-white hover:bg-[#E64500] shadow-lg shadow-[#FF5000]/25 hover:shadow-xl hover:shadow-[#FF5000]/30 hover:scale-[1.02]"
-                      style={{ fontFamily: "'Manrope', sans-serif" }}
                       onClick={() => {
-                        // In a real app, this would add to cart
-                        alert('System added to cart! 🎉');
+                        // Announce via ARIA live region instead of inaccessible alert()
+                        const liveEl = document.getElementById('aria-assertive-live');
+                        if (liveEl) {
+                          liveEl.textContent = '';
+                          requestAnimationFrame(() => {
+                            liveEl.textContent = 'System added to cart successfully.';
+                          });
+                        }
                       }}
                     >
                       <ShoppingCart className="w-6 h-6" />
