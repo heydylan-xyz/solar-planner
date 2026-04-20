@@ -864,17 +864,21 @@ const PlannerState = {
 
     if (this.currentStage === 1) {
       AriaLive.announce(
-        `Your gear uses ${totalWhPerDay} watt-hours per day. ` +
-        `Total for ${this.tripDays} day trip: ${totalWhNeeded} watt-hours.`
+        `Updated total: your gear now uses ${totalWhPerDay} watt-hours per day. ` +
+        `Total needed for ${this.tripDays} day trip: ${totalWhNeeded} watt-hours.`
       );
       return;
     }
 
     if (this.currentStage === 2 && this.selectedStation) {
+      const stationCap = this.selectedStation.capacityWh;
+      const demand = totalWhNeeded;
+      const remaining = stationCap - demand;
+      const pct = Math.round((demand / stationCap) * 100);
       AriaLive.announce(
-        `Selected: ${this.selectedStation.name}, ` +
-        `${this.selectedStation.capacityWh} watt-hour capacity. ` +
-        `${this.results.stationRecs.recommended.length} compatible stations found.`
+        `${this.selectedStation.name} selected. ` +
+        `${pct}% capacity used: ${demand.toLocaleString()} watt-hours demand of ${stationCap.toLocaleString()} total. ` +
+        `${remaining > 0 ? remaining.toLocaleString() + " watt-hours remaining." : "Demand meets capacity."}`
       );
       return;
     }

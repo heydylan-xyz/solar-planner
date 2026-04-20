@@ -174,11 +174,13 @@ export default function App() {
     }
   }, [plannerLoaded]);
 
-  // Move focus to stage heading on every navigation — critical for TalkBack/VoiceOver
-  // Without this, screen readers go silent after stage transitions
+  // Move focus to stage heading only on genuine stage navigation
+  // Using a ref to track previous stage prevents re-focus on re-renders
+  const prevStageRef = useRef<number>(0);
   useEffect(() => {
     if (!plannerLoaded) return;
-    // Small delay allows AnimatePresence to mount the new stage DOM before focus
+    if (prevStageRef.current === currentStage) return; // no-op on re-renders
+    prevStageRef.current = currentStage;
     const timer = setTimeout(() => {
       stageHeadingRef.current?.focus();
     }, 450);
@@ -940,6 +942,7 @@ export default function App() {
                         aria-disabled={!isViable}
                         role="button"
                         aria-pressed={isSelected}
+                        aria-atomic="false"
                         tabIndex={isViable ? 0 : -1}
                         onKeyDown={(e) => {
                           if ((e.key === 'Enter' || e.key === ' ') && isViable) {
@@ -988,7 +991,8 @@ export default function App() {
                             )}
                           </div>
                           <div className="flex sm:flex-col items-center sm:items-end gap-2">
-                            <div className="text-xl sm:text-2xl font-bold">
+                            <div className="text-xl sm:text-2xl font-bold"
+                              aria-label={`Price: $${station.priceUSD.toLocaleString()}`}>
                               ${station.priceUSD.toLocaleString()}
                             </div>
                             {(isBestFit || isHeroRecommendation) && (
@@ -1124,7 +1128,7 @@ export default function App() {
                     <div
                       id="battery-container"
                       className={`relative w-40 h-80 mx-auto mb-6 border-4 border-gray-800 rounded-2xl overflow-hidden bg-white transition-all duration-500 ${selectedStation ? 'battery-glow' : ''}`}
-                      style={{ borderTopLeftRadius: '1rem', borderTopRightRadius: '1rem' }}
+                      
                     >
                       {/* Battery Terminal */}
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-3 bg-gray-800 rounded-t-lg" />
@@ -1139,8 +1143,7 @@ export default function App() {
                             : '0%'
                         }}
                         transition={{ duration: 1, ease: 'easeOut' }}
-                        className="absolute bottom-0 w-full bg-gradient-to-t from-[#FF5000] to-[#FF8040]"
-                        style={{ animation: selectedStation ? 'batteryPulse 2s ease-in-out infinite' : 'none' }}
+                        className={selectedStation ? "absolute bottom-0 w-full bg-gradient-to-t from-[#FF5000] to-[#FF8040] animate-[batteryPulse_2s_ease-in-out_infinite]" : "absolute bottom-0 w-full bg-gradient-to-t from-[#FF5000] to-[#FF8040]"}
                       />
 
                       {/* Capacity Labels */}
@@ -1299,7 +1302,7 @@ export default function App() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 sm:gap-3 mb-2">
                                 <Sun className={`w-8 h-8 sm:w-10 sm:h-10 ${isSelected ? 'text-[#FF5000]' : 'text-gray-400'}`} />
-                                <div className="text-2xl sm:text-3xl font-bold" style={{ color: isSelected ? '#FF5000' : '#1a1a1a' }}>
+                                <div className={`text-2xl sm:text-3xl font-bold ${isSelected ? 'text-[#FF5000]' : 'text-gray-900'}`}>
                                   {panel.wattage}W
                                 </div>
                               </div>
@@ -1382,28 +1385,31 @@ export default function App() {
                       <div
                         id="solar-input-watts"
                         className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#FF5000]"
+                        aria-label={`Current output: ${Math.round(realTimeSolarInput)} watts at ${sunIntensity}% sun intensity`}
                       >
-                        {Math.round(realTimeSolarInput)}W
+                        <span aria-hidden="true">{Math.round(realTimeSolarInput)}W</span>
                       </div>
                       <div className="text-xs text-gray-500 mt-1">at {sunIntensity}% sun intensity</div>
                     </div>
 
-                    <div className="space-y-2 sm:space-y-3 p-3 sm:p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg sm:rounded-xl border border-green-200">
+                    <dl className="space-y-2 sm:space-y-3 p-3 sm:p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg sm:rounded-xl border border-green-200">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Daily Recovery</span>
-                        <span className="text-lg font-bold text-green-700">
+                        <dt className="text-sm text-gray-600">Daily Recovery</dt>
+                        <dd className="text-lg font-bold text-green-700"
+                          aria-label={`${solarDailyRecoveryWh} watt-hours per day`}>
                           {solarDailyRecoveryWh} Wh
-                        </span>
+                        </dd>
                       </div>
                       {solarDaysToFullCharge && (
                         <div className="flex justify-between items-center pt-3 border-t border-green-200">
-                          <span className="text-sm text-gray-600">Full Charge Time</span>
-                          <span className="text-lg font-bold text-[#FF5000]">
+                          <dt className="text-sm text-gray-600">Full Charge Time</dt>
+                          <dd className="text-lg font-bold text-[#FF5000]"
+                            aria-label={`${solarDaysToFullCharge} days to fully charge station`}>
                             {solarDaysToFullCharge} days
-                          </span>
+                          </dd>
                         </div>
                       )}
-                    </div>
+                    </dl>
                   </div>
 
                   {/* Energy Balance */}
@@ -1425,28 +1431,30 @@ export default function App() {
                         Energy Balance
                       </h3>
 
-                      <div className="space-y-2 sm:space-y-3">
+                      <dl className="space-y-2 sm:space-y-3">
                         <div className="flex items-center justify-between p-2 sm:p-3 bg-white/70 rounded-lg text-sm sm:text-base">
-                          <span className="text-xs sm:text-sm text-gray-600">Status</span>
-                          <span className="text-base sm:text-lg font-bold capitalize">
+                          <dt className="text-xs sm:text-sm text-gray-600">Status</dt>
+                          <dd className="text-base sm:text-lg font-bold capitalize">
                             {netStatus}
-                          </span>
+                          </dd>
                         </div>
                         <div className="flex items-center justify-between p-2 sm:p-3 bg-white/70 rounded-lg text-sm sm:text-base">
-                          <span className="text-xs sm:text-sm text-gray-600">Coverage</span>
-                          <span className="text-base sm:text-lg font-bold">
+                          <dt className="text-xs sm:text-sm text-gray-600">Coverage</dt>
+                          <dd className="text-base sm:text-lg font-bold"
+                            aria-label={`${coveragePercent}% of daily demand covered by solar`}>
                             {coveragePercent}%
-                          </span>
+                          </dd>
                         </div>
                         <div className="flex items-center justify-between p-2 sm:p-3 bg-white/70 rounded-lg text-sm sm:text-base">
-                          <span className="text-xs sm:text-sm text-gray-600">Net Daily Balance</span>
-                          <span
+                          <dt className="text-xs sm:text-sm text-gray-600">Net Daily Balance</dt>
+                          <dd
                             className={`text-lg font-bold ${netWhPerDay >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                            aria-label={`Net daily balance: ${netWhPerDay >= 0 ? "plus " : "minus "}${Math.abs(netWhPerDay)} watt-hours`}
                           >
                             {netWhPerDay >= 0 ? '+' : ''}{netWhPerDay} Wh
-                          </span>
+                          </dd>
                         </div>
-                      </div>
+                      </dl>
                     </motion.div>
                   )}
 
@@ -1499,7 +1507,7 @@ export default function App() {
                         <h3 className="text-xl sm:text-2xl font-bold mb-1">
                           Complete System
                         </h3>
-                        <p className="text-sm sm:text-base text-white/90">Ready to power your adventure</p>
+                        <p className="text-sm sm:text-base text-white/90" aria-hidden="true">Ready to power your adventure</p>
                       </div>
                       <Award className="w-10 h-10 sm:w-12 sm:h-12 text-white/90" aria-hidden="true" />
                     </div>
@@ -1516,22 +1524,22 @@ export default function App() {
                       {/* Selected Appliances */}
                       {results.demand && results.demand.breakdown.length > 0 && (
                         <div className="bg-gray-50 rounded-xl p-4">
-                          <div className="text-sm font-semibold text-gray-600 mb-3">Selected Gear ({results.demand.breakdown.length} items)</div>
-                          <div className="space-y-2">
+                          <h5 className="text-sm font-semibold text-gray-600 mb-3">Selected Gear ({results.demand.breakdown.length} items)</h5>
+                          <dl className="space-y-2">
                             {results.demand.breakdown.map((item: any) => (
                               <div key={item.id} className="flex justify-between items-center text-sm">
-                                <span className="text-gray-700">{item.name}</span>
-                                <span className="font-semibold text-gray-900">{item.whPerDay} Wh/day</span>
+                                <dt className="text-gray-700">{item.name}</dt>
+                                <dd className="font-semibold text-gray-900">{item.whPerDay} Wh/day</dd>
                               </div>
                             ))}
-                          </div>
+                          </dl>
                         </div>
                       )}
 
                       {/* Power Station */}
                       {selectedStation && (
                         <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border-2 border-[#FF5000]/20">
-                          <div className="text-sm font-semibold text-[#FF5000] mb-3">Power Station</div>
+                          <h5 className="text-sm font-semibold text-[#FF5000] mb-3">Power Station</h5>
                           {selectedStation === 'explorer-5000-plus' && stationQuantity > 1 ? (
                             <div className="space-y-2">
                               {/* Hub */}
@@ -1573,7 +1581,8 @@ export default function App() {
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="text-2xl font-bold text-[#FF5000]">
+                                <div className="text-2xl font-bold text-[#FF5000]"
+                                  aria-label={`Total price: $${(selectedStation === 'explorer-5000-plus' && stationQuantity > 1 ? (stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) + ((stationQuantity - 1) * 2999) : ((stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) * stationQuantity)).toLocaleString()}`}>
                                   ${(selectedStation === 'explorer-5000-plus' && stationQuantity > 1
                             ? (stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) + ((stationQuantity - 1) * 2999)
                             : ((stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) * stationQuantity)
@@ -1591,8 +1600,8 @@ export default function App() {
                       {/* Solar Panels */}
                       {totalPanelCount > 0 && (
                         <div className="bg-gradient-to-br from-blue-50 to-sky-50 rounded-xl p-4 border-2 border-blue-200">
-                          <div className="text-sm font-semibold text-blue-700 mb-2">Solar Array ({totalPanelCount} panels)</div>
-                          <div className="space-y-2">
+                          <h5 className="text-sm font-semibold text-blue-700 mb-2">Solar Array ({totalPanelCount} panels)</h5>
+                          <dl className="space-y-2">
                             {Object.entries(panelQuantities)
                               .filter(([_, qty]) => qty > 0)
                               .map(([panelId, qty]) => {
@@ -1600,30 +1609,30 @@ export default function App() {
                                 if (!panel) return null;
                                 return (
                                   <div key={panelId} className="flex justify-between items-center">
-                                    <div className="flex items-center gap-2">
-                                      <Sun className="w-5 h-5 text-amber-500" />
+                                    <dt className="flex items-center gap-2">
+                                      <Sun className="w-5 h-5 text-amber-500" aria-hidden="true" />
                                       <span className="font-semibold">{qty}x {panel.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-sm">
-                                      <span className="text-gray-500">{qty * panel.wattage}W</span>
+                                    </dt>
+                                    <dd className="flex items-center gap-3 text-sm">
+                                      <span className="text-gray-500" aria-label={`${qty * panel.wattage} watts`}>{qty * panel.wattage}W</span>
                                       <span className="font-semibold text-gray-900">${((panel.priceUSD || 0) * qty).toLocaleString()}</span>
-                                    </div>
+                                    </dd>
                                   </div>
                                 );
                               })}
-                            <div className="pt-2 border-t border-blue-200 flex justify-between items-center">
-                              <span className="text-sm font-semibold">Total Generation:</span>
-                              <span className="text-sm font-bold text-blue-700">{Math.round(realTimeSolarInput)}W</span>
-                            </div>
-                            <div className="pt-1 flex justify-between items-center">
-                              <span className="text-sm font-semibold">Panel Subtotal:</span>
-                              <span className="text-sm font-bold text-gray-900">
-                                ${Object.entries(panelQuantities).reduce((sum, [pid, pqty]) => {
-                                  const p = panels.find((pl: any) => pl.id === pid);
-                                  return sum + (p?.priceUSD || 0) * pqty;
-                                }, 0).toLocaleString()}
-                              </span>
-                            </div>
+                          </dl>
+                          <div className="pt-2 border-t border-blue-200 flex justify-between items-center">
+                            <span className="text-sm font-semibold">Total Generation:</span>
+                            <span className="text-sm font-bold text-blue-700">{Math.round(realTimeSolarInput)}W</span>
+                          </div>
+                          <div className="pt-1 flex justify-between items-center">
+                            <span className="text-sm font-semibold">Panel Subtotal:</span>
+                            <span className="text-sm font-bold text-gray-900">
+                              ${Object.entries(panelQuantities).reduce((sum, [pid, pqty]) => {
+                                const p = panels.find((pl: any) => pl.id === pid);
+                                return sum + (p?.priceUSD || 0) * pqty;
+                              }, 0).toLocaleString()}
+                            </span>
                           </div>
                         </div>
                       )}
@@ -1638,28 +1647,31 @@ export default function App() {
                     </h4>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border border-gray-200">
-                        <div className="text-sm text-gray-600 mb-1">Daily Demand</div>
-                        <div className="text-2xl sm:text-3xl font-bold text-gray-900">
+                      <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border border-gray-200"
+                        role="group" aria-label={`Daily demand: ${results.demand?.totalWhPerDay || 0} watt-hours per day`}>
+                        <div className="text-sm text-gray-600 mb-1" aria-hidden="true">Daily Demand</div>
+                        <div className="text-2xl sm:text-3xl font-bold text-gray-900" aria-hidden="true">
                           {results.demand?.totalWhPerDay || 0}
                         </div>
-                        <div className="text-xs text-gray-500">Wh/day</div>
+                        <div className="text-xs text-gray-500" aria-hidden="true">Wh/day</div>
                       </div>
 
-                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
-                        <div className="text-sm text-gray-600 mb-1">Solar Recovery</div>
-                        <div className="text-2xl sm:text-3xl font-bold text-green-700">
+                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200"
+                        role="group" aria-label={`Solar recovery: ${solarDailyRecoveryWh} watt-hours per day`}>
+                        <div className="text-sm text-gray-600 mb-1" aria-hidden="true">Solar Recovery</div>
+                        <div className="text-2xl sm:text-3xl font-bold text-green-700" aria-hidden="true">
                           {solarDailyRecoveryWh}
                         </div>
-                        <div className="text-xs text-gray-500">Wh/day</div>
+                        <div className="text-xs text-gray-500" aria-hidden="true">Wh/day</div>
                       </div>
 
-                      <div className="bg-gradient-to-br from-blue-50 to-sky-50 p-4 rounded-xl border border-blue-200">
-                        <div className="text-sm text-gray-600 mb-1">Net Balance</div>
-                        <div className={`text-2xl sm:text-3xl font-bold ${netWhPerDay >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <div className="bg-gradient-to-br from-blue-50 to-sky-50 p-4 rounded-xl border border-blue-200"
+                        role="group" aria-label={`Net daily balance: ${netWhPerDay >= 0 ? "+" : ""}${netWhPerDay} watt-hours per day`}>
+                        <div className="text-sm text-gray-600 mb-1" aria-hidden="true">Net Balance</div>
+                        <div className={`text-2xl sm:text-3xl font-bold ${netWhPerDay >= 0 ? 'text-green-600' : 'text-red-600'}`} aria-hidden="true">
                           {netWhPerDay >= 0 ? '+' : ''}{netWhPerDay}
                         </div>
-                        <div className="text-xs text-gray-500">Wh/day</div>
+                        <div className="text-xs text-gray-500" aria-hidden="true">Wh/day</div>
                       </div>
                     </div>
                   </div>
@@ -1745,9 +1757,10 @@ export default function App() {
                   <div className="bg-gradient-to-br from-gray-50 to-white p-8 border-t-2 border-gray-100">
                     <div className="flex items-center justify-between mb-6">
                       <div>
-                        <div className="text-sm text-gray-600 mb-1">Estimated System Total</div>
-                        <div className="text-4xl font-bold text-gray-900">
-                          ${(() => {
+                        <div className="text-sm text-gray-600 mb-1" aria-hidden="true">Estimated System Total</div>
+                        <div className="text-4xl font-bold text-gray-900"
+                          aria-label="Estimated system total"
+                          >${(() => {
                             const stationTotal = selectedStation
                               ? (selectedStation === 'explorer-5000-plus' && stationQuantity > 1
                                 ? (stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) + ((stationQuantity - 1) * 2999)
@@ -1760,7 +1773,7 @@ export default function App() {
                             return (stationTotal + panelTotal).toLocaleString();
                           })()}
                         </div>
-                        <div className="text-sm text-gray-500 mt-1">
+                        <div className="text-sm text-gray-500 mt-1" aria-hidden="true">
                           Station{stationQuantity > 1 ? 's' : ''} + {totalPanelCount > 0 ? `${totalPanelCount} panel${totalPanelCount > 1 ? 's' : ''}` : 'no panels'}
                         </div>
                       </div>
