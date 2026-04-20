@@ -661,6 +661,7 @@ export default function App() {
                             role="tab"
                             aria-selected={isActive}
                             aria-controls={`panel-${category}`}
+                            aria-label={category}
                             onClick={() => setSelectedCategory(category)}
                             className={`
                               flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 lg:py-3 rounded-lg lg:rounded-xl font-semibold whitespace-nowrap transition-all duration-300 text-sm sm:text-base
@@ -670,8 +671,8 @@ export default function App() {
                               }
                             `}
                           >
-                            <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                            <span className="hidden sm:inline">{category}</span>
+                            <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
+                            <span className="hidden sm:inline" aria-hidden="true">{category}</span>
                           </button>
                         );
                       })}
@@ -704,8 +705,8 @@ export default function App() {
                             role={!isSelected ? "button" : "article"}
                             tabIndex={!isSelected ? 0 : undefined}
                             aria-label={!isSelected
-                              ? `Add ${appliance.name}, ${appliance.wattage} watts${isHighEnergy ? ", high energy device" : ""}`
-                              : `${appliance.name} selected, ${qty} ${appliance.logic === 'event' ? 'uses' : 'hours'} per day`
+                              ? `Add ${appliance.name}, ${appliance.wattage} watts${isHighEnergy ? ", high energy device" : ""}. Double tap to add.`
+                              : `${appliance.name} added. ${qty} ${appliance.logic === 'event' ? 'uses per day' : 'hours per day'}.`
                             }
                             onKeyDown={(e) => {
                               if (!isSelected && (e.key === 'Enter' || e.key === ' ')) {
@@ -742,8 +743,8 @@ export default function App() {
                                   {appliance.name}
                                 </h3>
                                 <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm flex-wrap">
-                                  <span className="text-gray-600">{appliance.wattage}W</span>
-                                  <span className="text-gray-400">•</span>
+                                  <span className="text-gray-600" aria-label={`${appliance.wattage} watts`}>{appliance.wattage}W</span>
+                                  <span className="text-gray-400" aria-hidden="true">•</span>
                                   <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${isSelected ? 'bg-[#FF5000] text-white' : 'bg-gray-100 text-gray-600'}`}>
                                     {usageType}
                                   </span>
@@ -788,6 +789,8 @@ export default function App() {
                                 <span
                                   className="flex-1 text-center font-bold text-sm sm:text-base lg:text-lg"
                                   id={`qty-${appliance.id}`}
+                                  aria-live="polite"
+                                  aria-label={`${appliance.name}: ${qty} ${appliance.logic === 'event' ? 'uses per day' : 'hours per day'}`}
                                 >
                                   {qty} {appliance.logic === 'event' ? 'uses' : 'hrs'}/day
                                 </span>
@@ -976,7 +979,7 @@ export default function App() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm sm:text-base text-gray-600">{station.capacityWh.toLocaleString()} Wh · {station.acOutputW}W</p>
+                            <p className="text-sm sm:text-base text-gray-600" aria-label={`${station.capacityWh.toLocaleString()} watt-hours capacity, ${station.acOutputW} watts output`}>{station.capacityWh.toLocaleString()} Wh · {station.acOutputW}W</p>
 
                             {/* Quantity Display for Selected Station */}
                             {isSelected && station.id === 'explorer-5000-plus' && stationQuantity > 1 && (
@@ -993,7 +996,7 @@ export default function App() {
                           <div className="flex sm:flex-col items-center sm:items-end gap-2">
                             <div className="text-xl sm:text-2xl font-bold"
                               aria-label={`Price: $${station.priceUSD.toLocaleString()}`}>
-                              ${station.priceUSD.toLocaleString()}
+                              <span aria-hidden="true">${station.priceUSD.toLocaleString()}</span>
                             </div>
                             {(isBestFit || isHeroRecommendation) && (
                               <span className="px-2 sm:px-3 py-1 bg-[#FF5000] text-white text-xs sm:text-sm rounded-full font-semibold whitespace-nowrap">
@@ -1031,7 +1034,7 @@ export default function App() {
 
                         <div className="flex gap-4 text-sm text-gray-600 mb-4">
                           <span>{station.weightKg} kg</span>
-                          <span>•</span>
+                          <span aria-hidden="true">•</span>
                           <span>Max {station.maxSolarInputW}W solar input</span>
                         </div>
 
@@ -1302,15 +1305,16 @@ export default function App() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 sm:gap-3 mb-2">
                                 <Sun className={`w-8 h-8 sm:w-10 sm:h-10 ${isSelected ? 'text-[#FF5000]' : 'text-gray-400'}`} />
-                                <div className={`text-2xl sm:text-3xl font-bold ${isSelected ? 'text-[#FF5000]' : 'text-gray-900'}`}>
-                                  {panel.wattage}W
+                                <div className={`text-2xl sm:text-3xl font-bold ${isSelected ? 'text-[#FF5000]' : 'text-gray-900'}`}
+                                  aria-label={`${panel.wattage} watts`}>
+                                  <span aria-hidden="true">{panel.wattage}W</span>
                                 </div>
                               </div>
                               <div className="text-sm text-gray-600 mb-1">{panel.name}</div>
                               <div className="flex items-center gap-2 text-xs text-gray-500">
                                 <span>{panel.weightKg} kg per panel</span>
-                                <span className="text-gray-300">•</span>
-                                <span className="font-semibold text-gray-700">${(panel.priceUSD || 0).toLocaleString()} each</span>
+                                <span className="text-gray-300" aria-hidden="true">•</span>
+                                <span className="font-semibold text-gray-700" aria-label={`$${(panel.priceUSD || 0).toLocaleString()} each`}><span aria-hidden="true">${(panel.priceUSD || 0).toLocaleString()} each</span></span>
                               </div>
                             </div>
                             {isSelected && (
@@ -1350,9 +1354,10 @@ export default function App() {
                           {/* Total wattage + price for this panel type */}
                           {isSelected && (
                             <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center text-sm">
-                              <span className="text-gray-600">{qty * panel.wattage}W total</span>
-                              <span className="font-bold text-[#FF5000]">
-                                ${((panel.priceUSD || 0) * qty).toLocaleString()}
+                              <span className="text-gray-600" aria-label={`${qty * panel.wattage} watts total`}>{qty * panel.wattage}W total</span>
+                              <span className="font-bold text-[#FF5000]"
+                                aria-label={`$${((panel.priceUSD || 0) * qty).toLocaleString()} total for ${qty} panel${qty > 1 ? 's' : ''}`}>
+                                <span aria-hidden="true">${((panel.priceUSD || 0) * qty).toLocaleString()}</span>
                               </span>
                             </div>
                           )}
@@ -1365,8 +1370,10 @@ export default function App() {
                     {totalPanelCount > 0 && (
                       <div className="mt-6 p-4 bg-gray-50 rounded-xl flex items-center justify-between">
                         <div className="font-semibold text-gray-700">Total Panels Selected:</div>
-                        <div className="text-2xl font-bold text-[#FF5000]" id="panel-qty">
-                          {totalPanelCount}
+                        <div className="text-2xl font-bold text-[#FF5000]" id="panel-qty"
+                          aria-live={hasInteracted.current ? "polite" : "off"}
+                          aria-label={`${totalPanelCount} panel${totalPanelCount !== 1 ? 's' : ''} selected`}>
+                          <span aria-hidden="true">{totalPanelCount}</span>
                         </div>
                       </div>
                     )}
@@ -1583,12 +1590,12 @@ export default function App() {
                               <div className="text-right">
                                 <div className="text-2xl font-bold text-[#FF5000]"
                                   aria-label={`Total price: $${(selectedStation === 'explorer-5000-plus' && stationQuantity > 1 ? (stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) + ((stationQuantity - 1) * 2999) : ((stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) * stationQuantity)).toLocaleString()}`}>
-                                  ${(selectedStation === 'explorer-5000-plus' && stationQuantity > 1
+                                  <span aria-hidden="true">${(selectedStation === 'explorer-5000-plus' && stationQuantity > 1
                             ? (stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) + ((stationQuantity - 1) * 2999)
                             : ((stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) * stationQuantity)
-                          ).toLocaleString()}
+                          ).toLocaleString()}</span>
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-gray-500" aria-hidden="true">
                                   ${(stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0).toLocaleString()} each
                                 </div>
                               </div>
@@ -1627,11 +1634,12 @@ export default function App() {
                           </div>
                           <div className="pt-1 flex justify-between items-center">
                             <span className="text-sm font-semibold">Panel Subtotal:</span>
-                            <span className="text-sm font-bold text-gray-900">
-                              ${Object.entries(panelQuantities).reduce((sum, [pid, pqty]) => {
+                            <span className="text-sm font-bold text-gray-900"
+                              aria-label={`Panel subtotal: $${Object.entries(panelQuantities).reduce((sum, [pid, pqty]) => { const p = panels.find((pl: any) => pl.id === pid); return sum + (p?.priceUSD || 0) * pqty; }, 0).toLocaleString()}`}>
+                              <span aria-hidden="true">${Object.entries(panelQuantities).reduce((sum, [pid, pqty]) => {
                                 const p = panels.find((pl: any) => pl.id === pid);
                                 return sum + (p?.priceUSD || 0) * pqty;
-                              }, 0).toLocaleString()}
+                              }, 0).toLocaleString()}</span>
                             </span>
                           </div>
                         </div>
@@ -1759,8 +1767,9 @@ export default function App() {
                       <div>
                         <div className="text-sm text-gray-600 mb-1" aria-hidden="true">Estimated System Total</div>
                         <div className="text-4xl font-bold text-gray-900"
-                          aria-label="Estimated system total"
-                          >${(() => {
+                          aria-label={`Estimated system total: $${(() => { const st = selectedStation ? (selectedStation === 'explorer-5000-plus' && stationQuantity > 1 ? (stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) + ((stationQuantity - 1) * 2999) : ((stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) * stationQuantity)) : 0; const pt = Object.entries(panelQuantities).reduce((sum, [pid, pqty]) => { const p = panels.find((pl: any) => pl.id === pid); return sum + (p?.priceUSD || 0) * pqty; }, 0); return (st + pt).toLocaleString(); })()}`}
+                        >
+                          <span aria-hidden="true">${(() => {
                             const stationTotal = selectedStation
                               ? (selectedStation === 'explorer-5000-plus' && stationQuantity > 1
                                 ? (stations.find((s: JackeryStation) => s.id === selectedStation)?.priceUSD || 0) + ((stationQuantity - 1) * 2999)
@@ -1771,7 +1780,7 @@ export default function App() {
                               return sum + (p?.priceUSD || 0) * pqty;
                             }, 0);
                             return (stationTotal + panelTotal).toLocaleString();
-                          })()}
+                          })()}</span>
                         </div>
                         <div className="text-sm text-gray-500 mt-1" aria-hidden="true">
                           Station{stationQuantity > 1 ? 's' : ''} + {totalPanelCount > 0 ? `${totalPanelCount} panel${totalPanelCount > 1 ? 's' : ''}` : 'no panels'}
@@ -1798,7 +1807,7 @@ export default function App() {
                     </button>
 
                     <div className="mt-4 text-center text-sm text-gray-500">
-                      Free shipping on orders over $500 • 30-day returns
+                      Free shipping on orders over $500 · 30-day returns
                     </div>
                   </div>
                 </div>
