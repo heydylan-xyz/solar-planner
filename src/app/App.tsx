@@ -1,5 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useReducedMotion } from 'motion/react';
+
+const useAnnouncer = () => {
+  const [message, setMessage] = useState('');
+  const [priority, setPriority] = useState<'polite' | 'assertive'>('polite');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const announce = useCallback((msg: string, type: 'polite' | 'assertive' = 'polite') => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPriority(type);
+      setMessage(msg);
+    }, 500);
+  }, []);
+
+  return { announce, message, priority };
+};
+
+
 import { motion, AnimatePresence } from 'motion/react';
 import { Battery, Sun, Zap, ChevronRight, CheckCircle2, Droplets, CloudRain, CloudSun, ShoppingCart, Award, TrendingUp, AlertCircle, UtensilsCrossed, Heart, Smartphone, Gamepad2, BatteryCharging, Bike } from 'lucide-react';
 
@@ -76,8 +94,15 @@ export default function App() {
   const [panelQuantities, setPanelQuantities] = useState<Record<string, number>>({});
   const [sunIntensity, setSunIntensity] = useState(100);
   const [plannerLoaded, setPlannerLoaded] = useState(false);
+  const [showCartModal, setShowCartModal] = useState(false);
   // Gate: suppress all aria-live announcements until user has interacted
   const hasInteracted = useRef(false);
+  const { announce, message, priority } = useAnnouncer();
+
+  // Track previous values to avoid duplicate announcements
+  const prevDemandRef = useRef<{ perDay: number; total: number } | null>(null);
+  const prevStationRef = useRef<string | null>(null);
+  const prevNetBalanceRef = useRef<string | null>(null);
   // Respect user's reduced motion OS preference
   const prefersReducedMotion = useReducedMotion();
   // Stage heading ref — receives focus on every stage transition so TalkBack
@@ -89,6 +114,51 @@ export default function App() {
     solar: null,
     netBalance: null
   });
+
+  // Announce demand changes
+  useEffect(() => {
+    if (!hasInteracted.current || !results.demand) return;
+    const { totalWhPerDay, totalWhNeeded } = results.demand;
+    if (prevDemandRef.current?.perDay === totalWhPerDay) return;
+    prevDemandRef.current = { perDay: totalWhPerDay, total: totalWhNeeded };
+    if (totalWhPerDay > 0) {
+      announce(
+        `Total: ${totalWhPerDay.toLocaleString()} watt-hours per day. ${totalWhNeeded.toLocaleString()} watt-hours total for trip.`,
+        'polite'
+      );
+    }
+  }, [results.demand]);
+
+  // Announce station selection
+  useEffect(() => {
+    if (!hasInteracted.current || currentStage !== 2 || !selectedStation || !results.stationRecs) return;
+    if (prevStationRef.current === selectedStation) return;
+    prevStationRef.current = selectedStation;
+    const station = results.stationRecs.all.find((s: JackeryStation) => s.id === selectedStation);
+    if (station) {
+      const demand = results.demand?.totalWhNeeded || 0;
+      const pct = Math.round((demand / station.capacityWh) * 100);
+      announce(
+        `${station.name} selected. ${pct}% capacity used: ${demand.toLocaleString()} watt-hours of ${station.capacityWh.toLocaleString()} total.`,
+        'polite'
+      );
+    }
+  }, [selectedStation, currentStage, results.stationRecs]);
+
+  // Announce net balance changes
+  useEffect(() => {
+    if (!hasInteracted.current || currentStage !== 3 || !results.netBalance) return;
+    const { netWhPerDay, status, coveragePercent } = results.netBalance;
+    const key = `${netWhPerDay}-${status}-${coveragePercent}`;
+    if (prevNetBalanceRef.current === key) return;
+    prevNetBalanceRef.current = key;
+    const sign = netWhPerDay >= 0 ? 'plus' : 'minus';
+    const absNet = Math.abs(netWhPerDay);
+    announce(
+      `Net: ${sign} ${absNet.toLocaleString()} watt-hours. Solar covers ${coveragePercent}% of demand.`,
+      status === 'deficit' ? 'assertive' : 'polite'
+    );
+  }, [results.netBalance, currentStage]);
 
   // Load the planner engine
   useEffect(() => {
@@ -174,23 +244,17 @@ export default function App() {
     }
   }, [plannerLoaded]);
 
-  // Move focus to stage heading only on genuine stage navigation
-  // Using a ref to track previous stage prevents re-focus on re-renders
-  // Track previous stage to only focus heading on genuine navigation,
-  // not on re-renders or initial load. Initialize to 1 so load doesn't trigger.
+  // Track previous stage to only announce on genuine navigation
   const prevStageRef = useRef<number>(1);
   useEffect(() => {
     if (prevStageRef.current === currentStage) return;
     prevStageRef.current = currentStage;
-    // Keep engine stage in sync so its announcements fire for the right stage
     if (window.JackeryPlanner) {
       window.JackeryPlanner.state.currentStage = currentStage;
     }
-    const timer = setTimeout(() => {
-      stageHeadingRef.current?.focus();
-    }, 450);
-    return () => clearTimeout(timer);
-  }, [currentStage]);
+    const stageNames = ['Gear Selection', 'Power Station', 'Solar Recovery', 'Review'];
+    announce(`Stage ${currentStage}: ${stageNames[currentStage - 1]}`, 'polite');
+  }, [currentStage, announce]);
 
   // Sync with planner state
   useEffect(() => {
@@ -231,8 +295,12 @@ export default function App() {
 
   // Data from planner - must be declared early
   const appliances = plannerLoaded && window.JackeryPlanner ? window.JackeryPlanner.data.appliances : [];
-  const stations = plannerLoaded && window.JackeryPlanner ? window.JackeryPlanner.data.lineup : [];
-  const panels = plannerLoaded && window.JackeryPlanner ? window.JackeryPlanner.data.panels : [];
+  const stations = plannerLoaded && window.JackeryPlanner 
+    ? [...window.JackeryPlanner.data.lineup].sort((a, b) => a.name.localeCompare(b.name)) 
+    : [];
+  const panels = plannerLoaded && window.JackeryPlanner 
+    ? [...window.JackeryPlanner.data.panels].sort((a, b) => a.name.localeCompare(b.name)) 
+    : [];
 
   useEffect(() => {
     if (!plannerLoaded || !window.JackeryPlanner) return;
@@ -367,9 +435,9 @@ export default function App() {
   };
 
   const categories = Object.keys(categoryMap);
-  const currentCategoryAppliances = appliances.filter((a: Appliance) =>
-    categoryMap[selectedCategory]?.appliances.includes(a.id)
-  );
+  const currentCategoryAppliances = appliances
+    .filter((a: Appliance) => categoryMap[selectedCategory]?.appliances.includes(a.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const getWeatherIcon = () => {
     if (sunIntensity >= 75) return <Sun className="w-8 h-8" aria-hidden="true" />;
@@ -385,9 +453,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* ARIA Live Regions - Must be present before planner loads */}
-      <div id="aria-polite-live" role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
-      <div id="aria-assertive-live" role="alert" aria-live="assertive" aria-atomic="true" className="sr-only" />
+      {/* ARIA Live Region - Controlled by useAnnouncer hook */}
+      <div
+        role="status"
+        aria-live={priority}
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {message}
+      </div>
 
       {!plannerLoaded ? (
         <div className="min-h-screen flex items-center justify-center">
@@ -404,14 +478,14 @@ export default function App() {
       {/* Header */}
       <header className="border-b border-[#F5F5F7] bg-white sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-          <a href="/" aria-label="Jackery Solar Planner — click to restart" className="flex items-center gap-2 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#FF5000] rounded-lg flex items-center justify-center">
-              <Battery className="w-5 h-5 sm:w-6 sm:h-6 text-white" aria-hidden="true" />
+          <a href="/" aria-label="Click to restart planner" className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#FF5000] rounded-lg flex items-center justify-center" aria-hidden="true">
+              <Battery className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <h1 className="text-lg sm:text-2xl">
-              Jackery Solar Planner
-            </h1>
           </a>
+          <h1 className="text-lg sm:text-2xl">
+            Jackery Solar Planner
+          </h1>
 
           {/* Stage Progress */}
           <nav aria-label="Planner stages" className="flex items-center gap-1 sm:gap-2">
@@ -444,7 +518,7 @@ export default function App() {
 
       {/* Mobile Sticky Stats Bars */}
       {currentStage === 1 && (
-        <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]">
+        <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Current demand summary">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-white" aria-hidden="true" />
@@ -473,7 +547,7 @@ export default function App() {
 
       {currentStage === 2 && (
         <>
-          <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]">
+          <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Selected power station">
             <div className="max-w-7xl mx-auto space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -604,7 +678,7 @@ export default function App() {
       )}
 
       {currentStage === 3 && (
-        <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]">
+        <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Net daily energy balance">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Sun className="w-5 h-5 text-white" aria-hidden="true" />
@@ -626,24 +700,29 @@ export default function App() {
         </div>
       )}
 
+      {/* Skip Link */}
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-white focus:text-[#FF5000]">
+        Skip to main content
+      </a>
+
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-6 sm:pb-12 gradient-mesh">
+      <main id="main-content" aria-label="Solar trip planner" className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-6 sm:pb-12 gradient-mesh">
         <AnimatePresence mode="wait">
           {/* STAGE 1: Gear Selection */}
           {currentStage === 1 && (
             <motion.div
               key="stage-1"
               id="stage-1"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+              animate={prefersReducedMotion ? false : { opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? false : { opacity: 0, y: -20 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="mb-4 sm:mb-6 lg:mb-8">
                 <h2
                   ref={stageHeadingRef}
                   tabIndex={-1}
-                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 outline-none"
+                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF5000] scroll-mt-4"
                   aria-label="Stage 1 of 4: Define Your Energy Needs. Select the devices you'll power."
                 >
                   Define Your Energy Needs
@@ -707,11 +786,12 @@ export default function App() {
                           <motion.div
                             key={appliance.id}
                             layout
-                            role={!isSelected ? "button" : "article"}
-                            tabIndex={!isSelected ? 0 : undefined}
+                            role="button"
+                            aria-pressed={isSelected}
+                            tabIndex={0}
                             aria-label={!isSelected
                               ? `Add ${appliance.name}, ${appliance.wattage} watts${isHighEnergy ? ", high energy device" : ""}. Double tap to add.`
-                              : `${appliance.name} added. ${qty} ${appliance.logic === 'event' ? 'uses per day' : 'hours per day'}.`
+                              : `${appliance.name} added. ${qty} ${appliance.logic === 'event' ? 'uses per day' : 'hours per day'}. Press to manage.`
                             }
                             onKeyDown={(e) => {
                               if (!isSelected && (e.key === 'Enter' || e.key === ' ')) {
@@ -748,14 +828,14 @@ export default function App() {
                                   {appliance.name}
                                 </h3>
                                 <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm flex-wrap">
-                                  <span className="text-gray-600" aria-label={`${appliance.wattage} watts`}>{appliance.wattage}W</span>
+                                  <span className="text-gray-600">{appliance.wattage}W</span>
                                   <span className="text-gray-400" aria-hidden="true">•</span>
                                   <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold ${isSelected ? 'bg-[#FF5000] text-white' : 'bg-gray-100 text-gray-600'}`}>
                                     {usageType}
                                   </span>
                                   {isHighEnergy && (
-                                    <span className="px-1.5 sm:px-2 py-0.5 bg-red-700 text-white text-xs font-bold rounded-md">
-                                      HIGH ENERGY
+                                    <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300`}>
+                                      High Energy
                                     </span>
                                   )}
                                 </div>
@@ -773,6 +853,7 @@ export default function App() {
                                 className="flex items-center gap-2 sm:gap-3 pt-3 sm:pt-4 border-t-2 border-gray-100"
                               >
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const newQty = qty - 1;
@@ -794,7 +875,6 @@ export default function App() {
                                 <span
                                   className="flex-1 text-center font-bold text-sm sm:text-base lg:text-lg"
                                   id={`qty-${appliance.id}`}
-                                  aria-live={currentStage === 1 ? "polite" : "off"}
                                   aria-label={`${appliance.name}: ${qty} ${appliance.logic === 'event' ? 'uses per day' : 'hours per day'}`}
                                 >
                                   {qty} {appliance.logic === 'event' ? 'uses' : 'hrs'}/day
@@ -828,10 +908,8 @@ export default function App() {
                     <div className="mb-6 text-center">
                       <div
                         id="total-demand-wh"
-                        aria-live={hasInteracted.current && currentStage === 1 ? "polite" : "off"}
-                        aria-atomic="true"
-                        aria-label={hasInteracted.current ? `${totalDemand.toLocaleString()} watt-hours per day` : undefined}
-                        className="text-4xl lg:text-5xl font-bold text-[#C93D00] mb-2"
+                        aria-label={`${totalDemand.toLocaleString()} watt-hours per day`}
+                        className="text-4xl lg:text-5xl font-bold text-[#FF5000] mb-2"
                       >
                         {totalDemand.toLocaleString()}
                       </div>
@@ -875,16 +953,16 @@ export default function App() {
             <motion.div
               key="stage-2"
               id="stage-2"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+              animate={prefersReducedMotion ? false : { opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? false : { opacity: 0, y: -20 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="mb-4 sm:mb-6 lg:mb-8">
                 <h2
                   ref={stageHeadingRef}
                   tabIndex={-1}
-                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 outline-none"
+                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF5000] scroll-mt-4"
                   aria-label={`Stage 2 of 4: Choose Your Power Station. You need ${results.demand?.totalWhNeeded || 0} watt-hours of capacity.`}
                 >
                   Choose Your Power Station
@@ -933,13 +1011,16 @@ export default function App() {
                       const isHeroRecommendation = demand > 5000 && station.id === 'explorer-5000-plus';
 
                       return (
-                      <motion.div
+                      <motion.button
+                        type="button"
                         key={station.id}
                         layout
+                        disabled={!isViable}
+                        aria-pressed={isSelected}
+                        aria-label={station.name}
                         onClick={() => {
                           if (isViable) {
                             setSelectedStation(station.id);
-                            // Set quantity to recommended amount if switching stations
                             if (selectedStation !== station.id) {
                               setStationQuantity(qtyNeeded);
                             }
@@ -947,20 +1028,6 @@ export default function App() {
                         }}
                         data-station-id={station.id}
                         data-viable={isViable}
-                        aria-disabled={!isViable}
-                        role="button"
-                        aria-pressed={isSelected}
-                        aria-atomic="false"
-                        tabIndex={isViable ? 0 : -1}
-                        onKeyDown={(e) => {
-                          if ((e.key === 'Enter' || e.key === ' ') && isViable) {
-                            e.preventDefault();
-                            setSelectedStation(station.id);
-                            if (selectedStation !== station.id) {
-                              setStationQuantity(qtyNeeded);
-                            }
-                          }
-                        }}
                         className={`
                           w-full p-4 sm:p-6 rounded-xl lg:rounded-2xl border-2 text-left transition-all duration-300
                           ${isSelected
@@ -984,7 +1051,7 @@ export default function App() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm sm:text-base text-gray-600" aria-label={`${station.capacityWh.toLocaleString()} watt-hours capacity, ${station.acOutputW} watts output`}>{station.capacityWh.toLocaleString()} Wh · {station.acOutputW}W</p>
+                            <p className="text-sm sm:text-base text-gray-600">{station.capacityWh.toLocaleString()} Wh · {station.acOutputW}W</p>
 
                             {/* Quantity Display for Selected Station */}
                             {isSelected && station.id === 'explorer-5000-plus' && stationQuantity > 1 && (
@@ -1087,7 +1154,7 @@ export default function App() {
                             </button>
                           </div>
                         )}
-                      </motion.div>
+                      </motion.button>
                       );
                     };
 
@@ -1135,8 +1202,7 @@ export default function App() {
 
                     <div
                       id="battery-container"
-                      className={`relative w-40 h-80 mx-auto mb-6 border-4 border-gray-800 rounded-2xl overflow-hidden bg-white transition-all duration-500 ${selectedStation ? 'battery-glow' : ''}`}
-                      
+className={`relative w-40 h-80 mx-auto mb-6 border-4 border-gray-800 rounded-2xl overflow-hidden bg-white transition-all duration-500 ${selectedStation ? 'battery-glow' : ''}`}
                     >
                       {/* Battery Terminal */}
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-16 h-3 bg-gray-800 rounded-t-lg" />
@@ -1214,16 +1280,16 @@ export default function App() {
             <motion.div
               key="stage-3"
               id="stage-3"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+              animate={prefersReducedMotion ? false : { opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? false : { opacity: 0, y: -20 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="mb-4 sm:mb-6 lg:mb-8">
                 <h2
                   ref={stageHeadingRef}
                   tabIndex={-1}
-                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 outline-none"
+                  className="text-xl sm:text-2xl lg:text-4xl mb-1 sm:mb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF5000] scroll-mt-4"
                   aria-label="Stage 3 of 4: Plan Your Solar Recovery. Select your SolarSaga panels and configure your setup."
                 >
                   Plan Your Solar Recovery
@@ -1319,7 +1385,7 @@ export default function App() {
                               <div className="flex items-center gap-2 text-xs text-gray-500">
                                 <span>{panel.weightKg} kg per panel</span>
                                 <span className="text-gray-300" aria-hidden="true">•</span>
-                                <span className="font-semibold text-gray-700" aria-label={`$${(panel.priceUSD || 0).toLocaleString()} each`}><span aria-hidden="true">${(panel.priceUSD || 0).toLocaleString()} each</span></span>
+                                <span className="font-semibold text-gray-700">${(panel.priceUSD || 0).toLocaleString()} each</span>
                               </div>
                             </div>
                             {isSelected && (
@@ -1359,9 +1425,8 @@ export default function App() {
                           {/* Total wattage + price for this panel type */}
                           {isSelected && (
                             <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center text-sm">
-                              <span className="text-gray-600" aria-label={`${qty * panel.wattage} watts total`}>{qty * panel.wattage}W total</span>
-                              <span className="font-bold text-[#FF5000]"
-                                aria-label={`$${((panel.priceUSD || 0) * qty).toLocaleString()} total for ${qty} panel${qty > 1 ? 's' : ''}`}>
+                              <span className="text-gray-600">{qty * panel.wattage}W total</span>
+                              <span className="font-bold text-[#FF5000]">
                                 <span aria-hidden="true">${((panel.priceUSD || 0) * qty).toLocaleString()}</span>
                               </span>
                             </div>
@@ -1376,7 +1441,6 @@ export default function App() {
                       <div className="mt-6 p-4 bg-gray-50 rounded-xl flex items-center justify-between">
                         <div className="font-semibold text-gray-700">Total Panels Selected:</div>
                         <div className="text-2xl font-bold text-[#FF5000]" id="panel-qty"
-                          aria-live={hasInteracted.current && currentStage === 3 ? "polite" : "off"}
                           aria-label={`${totalPanelCount} panel${totalPanelCount !== 1 ? 's' : ''} selected`}>
                           <span aria-hidden="true">{totalPanelCount}</span>
                         </div>
@@ -1491,16 +1555,16 @@ export default function App() {
             <motion.div
               key="stage-4"
               id="stage-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+              animate={prefersReducedMotion ? false : { opacity: 1, y: 0 }}
+              exit={prefersReducedMotion ? false : { opacity: 0, y: -20 }}
+              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
               <div className="mb-6 sm:mb-8">
                 <h2
                   ref={stageHeadingRef}
                   tabIndex={-1}
-                  className="text-2xl sm:text-3xl lg:text-4xl mb-2 outline-none"
+                  className="text-2xl sm:text-3xl lg:text-4xl mb-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF5000] scroll-mt-4"
                   aria-label="Stage 4 of 4: System Review and Checkout. Your complete solar power solution."
                 >
                   System Review & Checkout
@@ -1541,7 +1605,7 @@ export default function App() {
                             {results.demand.breakdown.map((item: any) => (
                               <div key={item.id} className="flex justify-between items-center text-sm">
                                 <dt className="text-gray-700">{item.name}</dt>
-                                <dd className="font-semibold text-gray-900" aria-label={`${item.whPerDay} watt-hours per day`}>{item.whPerDay} Wh/day</dd>
+                                <dd className="font-semibold text-gray-900">{item.whPerDay} Wh/day</dd>
                               </div>
                             ))}
                           </dl>
@@ -1627,7 +1691,7 @@ export default function App() {
                                       <span className="font-semibold">{qty}x {panel.name}</span>
                                     </dt>
                                     <dd className="flex items-center gap-3 text-sm">
-                                      <span className="text-gray-500" aria-label={`${qty * panel.wattage} watts`}>{qty * panel.wattage}W</span>
+                                      <span className="text-gray-500">{qty * panel.wattage}W</span>
                                       <span className="font-semibold text-gray-900">${((panel.priceUSD || 0) * qty).toLocaleString()}</span>
                                     </dd>
                                   </div>
@@ -1805,16 +1869,7 @@ export default function App() {
                     <button
                       id="checkout-button"
                       className="w-full py-5 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all duration-300 bg-[#FF5000] text-white hover:bg-[#E64500] shadow-lg shadow-[#FF5000]/25 hover:shadow-xl hover:shadow-[#FF5000]/30 hover:scale-[1.02]"
-                      onClick={() => {
-                        // Announce via ARIA live region instead of inaccessible alert()
-                        const liveEl = document.getElementById('aria-assertive-live');
-                        if (liveEl) {
-                          liveEl.textContent = '';
-                          requestAnimationFrame(() => {
-                            liveEl.textContent = 'System added to cart successfully.';
-                          });
-                        }
-                      }}
+                      onClick={() => setShowCartModal(true)}
                     >
                       <ShoppingCart className="w-6 h-6" />
                       Add Full System to Cart
@@ -1853,6 +1908,38 @@ export default function App() {
         </a>
         , not affiliated with the actual Jackery brand.
       </footer>
+
+      {/* Cart Success Modal */}
+      {showCartModal && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="cart-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setShowCartModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 id="cart-modal-title" className="text-xl font-bold text-gray-900 mb-2">
+              Added to Cart!
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Your solar power system has been added to cart. In a real implementation, this would proceed to checkout.
+            </p>
+            <button
+              onClick={() => setShowCartModal(false)}
+              className="w-full py-3 px-6 bg-[#FF5000] text-white rounded-xl font-semibold hover:bg-[#E64500] transition-colors"
+            >
+              Continue Shopping
+            </button>
+          </div>
+        </div>
+      )}
       </>
       )}
     </div>

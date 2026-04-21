@@ -836,7 +836,8 @@ const PlannerState = {
     }
 
     this._notifyUI();
-    this._announceResults();
+    // _announceResults disabled - React layer owns all ARIA announcements
+    // this._announceResults();
   },
 
   /**
