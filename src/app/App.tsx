@@ -518,7 +518,7 @@ export default function App() {
 
       {/* Mobile Sticky Stats Bars */}
       {currentStage === 1 && (
-        <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Current demand summary">
+        <div className="md:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Current demand summary">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-white" aria-hidden="true" />
@@ -547,7 +547,7 @@ export default function App() {
 
       {currentStage === 2 && (
         <>
-          <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Selected power station">
+          <div className="md:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Selected power station">
             <div className="max-w-7xl mx-auto space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -599,7 +599,7 @@ export default function App() {
 
           {/* Capacity Warning Bar */}
           {totalDemandNeeded > 0 && (
-            <div className="sticky top-[120px] sm:top-[128px] lg:top-[65px] z-40">
+            <div className="sticky top-[120px] sm:top-[128px] md:top-[65px] z-40">
               <div
                 className={`
                   max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3 border-b-2
@@ -678,7 +678,7 @@ export default function App() {
       )}
 
       {currentStage === 3 && (
-        <div className="lg:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Net daily energy balance">
+        <div className="md:hidden sticky top-[57px] sm:top-[65px] z-40 bg-gradient-to-r from-[#FF5000] to-[#FF8040] px-4 sm:px-6 py-3 shadow-lg border-b border-[#FF8040]" role="status" aria-live="polite" aria-label="Net daily energy balance">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Sun className="w-5 h-5 text-white" aria-hidden="true" />
@@ -730,11 +730,11 @@ export default function App() {
                 <p className="text-gray-700 text-sm sm:text-base lg:text-lg" aria-hidden="true">Select the devices you'll power</p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 lg:gap-8 pb-20 lg:pb-0">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] gap-4 md:gap-8 pb-20 md:pb-0">
                 <div className="space-y-4 lg:space-y-6">
                   {/* Category Navigation Pills */}
                   <div className="bg-white p-2 rounded-xl lg:rounded-2xl border-2 border-gray-200 shadow-sm">
-                    <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide" role="tablist" aria-label="Appliance categories">
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2" role="tablist" aria-label="Appliance categories">
                       {categories.map((category) => {
                         const CategoryIcon = categoryMap[category].icon;
                         const isActive = selectedCategory === category;
@@ -774,7 +774,7 @@ export default function App() {
                       role="tabpanel"
                       id={`panel-${selectedCategory}`}
                       aria-label={`${selectedCategory} appliances`}
-                      className="grid sm:grid-cols-2 gap-4"
+                      className="grid grid-cols-1 lg:grid-cols-2 gap-4"
                     >
                       {currentCategoryAppliances.map((appliance: Appliance, index: number) => {
                         const qty = selectedAppliances[appliance.id] || 0;
@@ -899,8 +899,8 @@ export default function App() {
                 </div>
 
                 {/* Demand Summary Sidebar - Hidden on Mobile */}
-                <div className="hidden lg:block lg:sticky lg:top-24 h-fit">
-                  <div className="bg-gradient-to-br from-gray-50 to-white p-6 lg:p-8 rounded-2xl border-2 border-gray-200 shadow-lg">
+                <div className="hidden md:block md:sticky md:top-24 h-fit">
+                  <div className="bg-gradient-to-br from-gray-50 to-white p-6 md:p-8 rounded-2xl border-2 border-gray-200 shadow-lg">
                     <h3 className="text-lg lg:text-xl font-bold mb-6 text-center">
                       Daily Demand
                     </h3>
@@ -972,9 +972,9 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 lg:gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_380px] gap-4 md:gap-8">
                 {/* Station Cards */}
-                <div className="space-y-4 lg:space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   {(() => {
                     // Split stations into recommended and secondary
                     const demand = results.demand?.totalWhNeeded || 0;
@@ -1194,9 +1194,9 @@ export default function App() {
                 </div>
 
                 {/* Battery Visualizer - Hidden on Mobile */}
-                <div className="hidden lg:block lg:sticky lg:top-24 h-fit">
-                  <div className="bg-gradient-to-br from-gray-50 to-white p-6 lg:p-8 rounded-2xl border-2 border-gray-200 shadow-lg">
-                    <h3 className="text-lg lg:text-xl font-bold mb-6 text-center">
+                <div className="hidden md:block md:sticky md:top-24 h-fit">
+                  <div className="bg-gradient-to-br from-gray-50 to-white p-6 md:p-8 rounded-2xl border-2 border-gray-200 shadow-lg">
+                    <h3 className="text-lg md:text-xl font-bold mb-6 text-center">
                       {selectedStation && stationQuantity > 1 ? 'Combined System Capacity' : 'Battery Capacity'}
                     </h3>
 
@@ -1297,13 +1297,13 @@ className={`relative w-40 h-80 mx-auto mb-6 border-4 border-gray-800 rounded-2xl
                 <p className="text-gray-700 text-xs sm:text-sm lg:text-base" aria-hidden="true">Select your SolarSaga panels and configure your setup</p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 lg:gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_380px] gap-4 md:gap-8">
                 {/* Left Column: Sun Intensity + Panel Grid */}
-                <div className="space-y-4 lg:space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   {/* Sun Intensity Slider */}
-                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 sm:p-6 lg:p-8 rounded-xl lg:rounded-2xl border-2 border-amber-200 shadow-lg">
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 sm:p-6 md:p-8 rounded-xl md:rounded-2xl border-2 border-amber-200 shadow-lg">
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
-                      <h3 className="text-lg sm:text-xl lg:text-2xl font-bold">
+                      <h3 className="text-lg sm:text-xl md:text-2xl font-bold">
                         Sun Intensity
                       </h3>
                       <motion.div
@@ -1352,7 +1352,7 @@ className={`relative w-40 h-80 mx-auto mb-6 border-4 border-gray-800 rounded-2xl
                     </h3>
                     <p className="text-sm text-gray-600 mb-4 sm:mb-6">Choose the panels that fit your portable power needs</p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                     {panels.map((panel: any) => {
                       const qty = panelQuantities[panel.id] || 0;
                       const isSelected = qty > 0;
@@ -1450,9 +1450,9 @@ className={`relative w-40 h-80 mx-auto mb-6 border-4 border-gray-800 rounded-2xl
                 </div>
 
                 {/* Right Sidebar: Solar Generation & Energy Balance - Hidden on Mobile */}
-                <div className="hidden lg:block lg:sticky lg:top-24 h-fit space-y-3 sm:space-y-4">
-                  <div className="bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 lg:p-8 rounded-xl lg:rounded-2xl border-2 border-gray-200 shadow-lg">
-                    <h3 className="text-base sm:text-lg lg:text-xl font-bold mb-4 sm:mb-6 text-center">
+                <div className="hidden md:block md:sticky md:top-24 h-fit space-y-3 sm:space-y-4">
+                  <div className="bg-gradient-to-br from-gray-50 to-white p-4 sm:p-6 md:p-8 rounded-xl md:rounded-2xl border-2 border-gray-200 shadow-lg">
+                    <h3 className="text-base sm:text-lg md:text-xl font-bold mb-4 sm:mb-6 text-center">
                       Solar Generation
                     </h3>
 
