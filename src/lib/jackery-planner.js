@@ -885,12 +885,13 @@ const PlannerState = {
 
     if (this.currentStage === 3 && this.results.solar && this.results.netBalance) {
       const { dailyRecoveryWh } = this.results.solar;
-      const { status, coveragePercent } = this.results.netBalance;
+      const { netWhPerDay, status, coveragePercent } = this.results.netBalance;
+      const sign = netWhPerDay >= 0 ? "plus" : "minus";
+      const absNet = Math.abs(netWhPerDay);
       const statusLabel = { surplus: "surplus", balanced: "balanced", deficit: "deficit" }[status];
       AriaLive.announce(
-        `Solar recovery: ${dailyRecoveryWh} watt-hours per day from ` +
-        `${this.panelCount} × ${this.results.solar.panelName} in ${this.weatherCondition} weather. ` +
-        `Coverage: ${coveragePercent}% — ${statusLabel}.`,
+        `Net daily balance: ${sign} ${absNet.toLocaleString()} watt-hours. ` +
+        `Solar covers ${coveragePercent}% of daily demand. Status: ${statusLabel}.`,
         status === "deficit" ? "assertive" : "polite"
       );
     }

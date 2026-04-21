@@ -182,6 +182,10 @@ export default function App() {
   useEffect(() => {
     if (prevStageRef.current === currentStage) return;
     prevStageRef.current = currentStage;
+    // Keep engine stage in sync so its announcements fire for the right stage
+    if (window.JackeryPlanner) {
+      window.JackeryPlanner.state.currentStage = currentStage;
+    }
     const timer = setTimeout(() => {
       stageHeadingRef.current?.focus();
     }, 450);
@@ -790,7 +794,7 @@ export default function App() {
                                 <span
                                   className="flex-1 text-center font-bold text-sm sm:text-base lg:text-lg"
                                   id={`qty-${appliance.id}`}
-                                  aria-live="polite"
+                                  aria-live={currentStage === 1 ? "polite" : "off"}
                                   aria-label={`${appliance.name}: ${qty} ${appliance.logic === 'event' ? 'uses per day' : 'hours per day'}`}
                                 >
                                   {qty} {appliance.logic === 'event' ? 'uses' : 'hrs'}/day
@@ -824,7 +828,7 @@ export default function App() {
                     <div className="mb-6 text-center">
                       <div
                         id="total-demand-wh"
-                        aria-live={hasInteracted.current ? "polite" : "off"}
+                        aria-live={hasInteracted.current && currentStage === 1 ? "polite" : "off"}
                         aria-atomic="true"
                         aria-label={hasInteracted.current ? `${totalDemand.toLocaleString()} watt-hours per day` : undefined}
                         className="text-4xl lg:text-5xl font-bold text-[#C93D00] mb-2"
@@ -1372,7 +1376,7 @@ export default function App() {
                       <div className="mt-6 p-4 bg-gray-50 rounded-xl flex items-center justify-between">
                         <div className="font-semibold text-gray-700">Total Panels Selected:</div>
                         <div className="text-2xl font-bold text-[#FF5000]" id="panel-qty"
-                          aria-live={hasInteracted.current ? "polite" : "off"}
+                          aria-live={hasInteracted.current && currentStage === 3 ? "polite" : "off"}
                           aria-label={`${totalPanelCount} panel${totalPanelCount !== 1 ? 's' : ''} selected`}>
                           <span aria-hidden="true">{totalPanelCount}</span>
                         </div>
@@ -1537,7 +1541,7 @@ export default function App() {
                             {results.demand.breakdown.map((item: any) => (
                               <div key={item.id} className="flex justify-between items-center text-sm">
                                 <dt className="text-gray-700">{item.name}</dt>
-                                <dd className="font-semibold text-gray-900">{item.whPerDay} Wh/day</dd>
+                                <dd className="font-semibold text-gray-900" aria-label={`${item.whPerDay} watt-hours per day`}>{item.whPerDay} Wh/day</dd>
                               </div>
                             ))}
                           </dl>
@@ -1549,44 +1553,45 @@ export default function App() {
                         <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border-2 border-[#FF5000]/20">
                           <h5 className="text-sm font-semibold text-[#FF5000] mb-3">Power Station</h5>
                           {selectedStation === 'explorer-5000-plus' && stationQuantity > 1 ? (
-                            <div className="space-y-2">
-                              {/* Hub */}
+                            <dl className="space-y-2">
                               <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <Battery className="w-5 h-5 text-[#FF5000]" />
+                                <dt className="flex items-center gap-2">
+                                  <Battery className="w-5 h-5 text-[#FF5000]" aria-hidden="true" />
                                   <span className="font-semibold">1x {stations.find((s: JackeryStation) => s.id === selectedStation)?.name} (Hub)</span>
-                                </div>
-                                <span className="text-sm text-gray-600">
+                                </dt>
+                                <dd className="text-sm text-gray-600"
+                                  aria-label={`${(stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0).toLocaleString()} watt-hours`}>
                                   {(stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0).toLocaleString()} Wh
-                                </span>
+                                </dd>
                               </div>
-                              {/* Expansion Packs */}
                               <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <Battery className="w-5 h-5 text-amber-500" />
+                                <dt className="flex items-center gap-2">
+                                  <Battery className="w-5 h-5 text-amber-500" aria-hidden="true" />
                                   <span className="font-semibold">{stationQuantity - 1}x Expansion Pack{stationQuantity > 2 ? 's' : ''}</span>
-                                </div>
-                                <span className="text-sm text-gray-600">
+                                </dt>
+                                <dd className="text-sm text-gray-600"
+                                  aria-label={`${((stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0) * (stationQuantity - 1)).toLocaleString()} watt-hours`}>
                                   {((stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0) * (stationQuantity - 1)).toLocaleString()} Wh
-                                </span>
+                                </dd>
                               </div>
-                              {/* Total */}
                               <div className="pt-2 border-t border-[#FF5000]/20 flex justify-between items-center">
-                                <span className="text-sm font-semibold">Total Capacity:</span>
-                                <span className="text-lg font-bold text-[#FF5000]">
+                                <dt className="text-sm font-semibold">Total Capacity:</dt>
+                                <dd className="text-lg font-bold text-[#FF5000]"
+                                  aria-label={`${((stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0) * stationQuantity).toLocaleString()} watt-hours total capacity`}>
                                   {((stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0) * stationQuantity).toLocaleString()} Wh
-                                </span>
+                                </dd>
                               </div>
-                            </div>
+                            </dl>
                           ) : (
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
-                                <div className="font-bold text-lg mb-1">
+                                <p className="font-bold text-lg mb-1">
                                   {stationQuantity}x {stations.find((s: JackeryStation) => s.id === selectedStation)?.name}
-                                </div>
-                                <div className="text-sm text-gray-600">
+                                </p>
+                                <p className="text-sm text-gray-600"
+                                  aria-label={`${((stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0) * stationQuantity).toLocaleString()} watt-hours total capacity`}>
                                   {((stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 0) * stationQuantity).toLocaleString()} Wh Total Capacity
-                                </div>
+                                </p>
                               </div>
                               <div className="text-right">
                                 <div className="text-2xl font-bold text-[#FF5000]"
@@ -1630,8 +1635,11 @@ export default function App() {
                               })}
                           </dl>
                           <div className="pt-2 border-t border-blue-200 flex justify-between items-center">
-                            <span className="text-sm font-semibold">Total Generation:</span>
-                            <span className="text-sm font-bold text-blue-700">{Math.round(realTimeSolarInput)}W</span>
+                            <span className="text-sm font-semibold" aria-hidden="true">Total Generation:</span>
+                            <span className="text-sm font-bold text-blue-700"
+                              aria-label={`Total solar generation: ${Math.round(realTimeSolarInput)} watts`}>
+                              <span aria-hidden="true">{Math.round(realTimeSolarInput)}W</span>
+                            </span>
                           </div>
                           <div className="pt-1 flex justify-between items-center">
                             <span className="text-sm font-semibold">Panel Subtotal:</span>
@@ -1694,8 +1702,9 @@ export default function App() {
 
                     <div className="space-y-3">
                       {/* Compatibility Badge */}
-                      <div id="compatibility-badge" className="flex items-center justify-between p-4 bg-green-50 rounded-xl border-2 border-green-200">
-                        <div className="flex items-center gap-3">
+                      <div id="compatibility-badge" className="flex items-center justify-between p-4 bg-green-50 rounded-xl border-2 border-green-200"
+                        role="status" aria-label="Fully Compatible: All components verified for optimal performance">
+                        <div className="flex items-center gap-3" aria-hidden="true">
                           <CheckCircle2 className="w-6 h-6 text-green-600" />
                           <div>
                             <div className="font-semibold text-green-900">Fully Compatible</div>
@@ -1712,8 +1721,10 @@ export default function App() {
                             : netStatus === 'balanced'
                               ? 'bg-blue-50 border-blue-200'
                               : 'bg-amber-50 border-amber-200'
-                        }`}>
-                          <div className="flex items-center gap-3">
+                        }`}
+                          role="status"
+                          aria-label={`Energy status: ${netStatus}. ${coveragePercent}% solar coverage of daily needs.`}>
+                          <div className="flex items-center gap-3" aria-hidden="true">
                             {netStatus === 'surplus' ? (
                               <CheckCircle2 className="w-6 h-6 text-green-600" />
                             ) : netStatus === 'balanced' ? (
@@ -1747,8 +1758,10 @@ export default function App() {
 
                       {/* Capacity Utilization */}
                       {selectedStation && results.demand && (
-                        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border-2 border-blue-200">
-                          <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-between p-4 bg-blue-50 rounded-xl border-2 border-blue-200"
+                          role="status"
+                          aria-label={`Optimal Capacity Match: Using ${(Math.min(100, (results.demand.totalWhNeeded / Math.max(1, (stations.find((s: JackeryStation) => s.id === selectedStation)?.capacityWh || 1))) * 100) || 0).toFixed(0)}% of battery capacity`}>
+                          <div className="flex items-center gap-3" aria-hidden="true">
                             <Battery className="w-6 h-6 text-blue-600" />
                             <div>
                               <div className="font-semibold text-blue-900">Optimal Capacity Match</div>
